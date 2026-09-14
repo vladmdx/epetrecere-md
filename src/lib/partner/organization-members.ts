@@ -9,6 +9,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  artists,
   partnerOrganizationMembers,
 } from "@/lib/db/schema";
 import {
@@ -16,9 +17,9 @@ import {
   acquireLegalScopeLocks,
 } from "@/lib/booking/advisory-locks";
 import {
-  authorizeOrganizationCapability,
+  authorizeOrganizationCapabilityLocked,
   countActiveOwners,
-  getAppUserById,
+  getLockedAppUserById,
   type OrgRole,
 } from "@/lib/venue-access";
 
@@ -56,9 +57,9 @@ async function authorizeLockedActor(
   actorUserId: string,
   organizationId: number,
 ) {
-  const actor = await getAppUserById(actorUserId, executor);
+  const actor = await getLockedAppUserById(actorUserId, executor);
   if (!actor) return null;
-  const access = await authorizeOrganizationCapability(
+  const access = await authorizeOrganizationCapabilityLocked(
     actor,
     organizationId,
     "manage_members",
@@ -66,6 +67,28 @@ async function authorizeLockedActor(
   );
   return access.ok ? access : null;
 }
+
+async function accountCanJoinVenueOrganization(
+  executor: typeof db,
+  userId: string,
+): Promise<boolean> {
+  const user = await getLockedAppUserById(userId, executor);
+  if (!user || user.role === "artist") return false;
+
+  const [artistProfile] = await executor
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.userId, userId))
+    .limit(1);
+  return !artistProfile;
+}
+
+const ROLE_CONFLICT_RESULT = {
+  ok: false as const,
+  status: 409 as const,
+  error: "Contul de artist nu poate deveni membru al unei organizații de localuri.",
+  code: "ROLE_CONFLICT",
+};
 
 export async function upsertOrganizationMember(
   actorUserId: string,
@@ -81,8 +104,11 @@ export async function upsertOrganizationMember(
     if (!await authorizeLockedActor(executor, actorUserId, organizationId)) {
       return { ok: false as const, status: 403 as const, error: "Forbidden", code: "FORBIDDEN" };
     }
-    if (!await getAppUserById(input.userId, executor)) {
+    if (!await getLockedAppUserById(input.userId, executor)) {
       return { ok: false as const, status: 404 as const, error: "User not found", code: "USER_NOT_FOUND" };
+    }
+    if (!await accountCanJoinVenueOrganization(executor, input.userId)) {
+      return ROLE_CONFLICT_RESULT;
     }
 
     const [existing] = await executor
@@ -170,6 +196,12 @@ export async function updateOrganizationMember(
 
     const nextRole = patch.role ?? (current.role as OrgRole);
     const nextActive = patch.isActive ?? current.isActive;
+    if (
+      nextActive &&
+      !await accountCanJoinVenueOrganization(executor, current.userId)
+    ) {
+      return ROLE_CONFLICT_RESULT;
+    }
     const removesActiveOwner = current.role === "owner" && current.isActive &&
       (nextRole !== "owner" || !nextActive);
     if (removesActiveOwner && await countActiveOwners(organizationId, executor) <= 1) {
@@ -207,8 +239,11 @@ export async function transferOrganizationOwner(
     if (!await authorizeLockedActor(executor, fromUserId, organizationId)) {
       return { ok: false as const, status: 403 as const, error: "Forbidden", code: "FORBIDDEN" };
     }
-    if (!await getAppUserById(toUserId, executor)) {
+    if (!await getLockedAppUserById(toUserId, executor)) {
       return { ok: false as const, status: 404 as const, error: "User not found", code: "USER_NOT_FOUND" };
+    }
+    if (!await accountCanJoinVenueOrganization(executor, toUserId)) {
+      return ROLE_CONFLICT_RESULT;
     }
 
     const [target] = await executor

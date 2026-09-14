@@ -70,7 +70,7 @@ async function main() {
       ORDER BY date
       LIMIT 50
     `);
-    console.log("  June 2026 availability rows:", availabilityRows.rows ?? availabilityRows);
+    console.log("  June 2026 availability rows:", availabilityRows);
 
     // Bookings on June 20
     const bookings = await db.execute(sql`
@@ -79,7 +79,7 @@ async function main() {
       WHERE artist_id = ${a.id}
         AND event_date::text = '2026-06-20'
     `);
-    console.log("  June 20 bookings:", bookings.rows ?? bookings);
+    console.log("  June 20 bookings:", bookings);
   }
 }
 

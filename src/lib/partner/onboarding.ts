@@ -3,10 +3,13 @@
  * Draft rows are the durable state; refresh/back/retry reuse them.
  * server-only.
  */
-import { and, asc, eq, gte, inArray, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import {
+  artists,
   bookingRequests,
+  notifications,
   partnerOrganizationMembers,
   partnerOrganizations,
   users,
@@ -16,25 +19,35 @@ import {
 } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
-import { assertMultiHallMutationsAllowed } from "./multi-hall-gate";
 import {
-  authorizeOrganizationCapability,
-  getAppUserById,
-  listAccessibleOrganizations,
+  ORG_STATUSES_ALLOWING_ACCESS,
+  authorizeOrganizationCapabilityLocked,
+  getLockedAppUserById,
   type AppUser,
 } from "@/lib/venue-access";
 import { organizationHasAnyAcceptance, organizationHasValidContract } from "./legal";
 import { organizationWriteCapability } from "./organization-write";
 import {
   emptyToNull,
-  hallDraftSchema,
+  organizationCreateSchema,
   organizationLegalIssues,
   organizationPatchSchema,
   validatePhoneOrError,
   venueDraftSchema,
   type MissingField,
 } from "./validation";
-import { acquireAvailabilityLocks, acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
+import {
+  acquireAvailabilityLocks,
+  acquireLegalScopeLocks,
+} from "@/lib/booking/advisory-locks";
+import { localDateInZone } from "@/lib/booking/zoned-interval";
+import {
+  captureVenueRegistrationSnapshot,
+  loadLockedVenueRegistrationSnapshot,
+  type VenueRegistrationSnapshot,
+  venueRegistrationSnapshotMatches,
+} from "./registration-state";
+import { writeUserPhoneLocked } from "@/lib/auth/user-phone";
 
 export type OnboardingStep =
   | "organization"
@@ -48,9 +61,13 @@ function slugCandidate(name: string): string {
   return name.trim() || "sala";
 }
 
-async function uniqueVenueSlug(name: string, excludeId?: number): Promise<string> {
+async function uniqueVenueSlug(
+  name: string,
+  excludeId?: number,
+  executor: typeof db = db,
+): Promise<string> {
   return pickUniqueSlug(slugCandidate(name), async (candidate) => {
-    const [hit] = await db
+    const [hit] = await executor
       .select({ id: venues.id })
       .from(venues)
       .where(eq(venues.slug, candidate))
@@ -58,19 +75,6 @@ async function uniqueVenueSlug(name: string, excludeId?: number): Promise<string
     return !!hit && hit.id !== excludeId;
   });
 }
-
-async function uniqueHallSlug(venueId: number, name: string, excludeId?: number): Promise<string> {
-  return pickUniqueSlug(slugCandidate(name), async (candidate) => {
-    const [hit] = await db
-      .select({ id: venueHalls.id })
-      .from(venueHalls)
-      .where(and(eq(venueHalls.venueId, venueId), eq(venueHalls.slug, candidate)))
-      .limit(1);
-    return !!hit && hit.id !== excludeId;
-  });
-}
-
-const ELIGIBLE_DRAFT_STATUSES = new Set(["draft", "rejected"]);
 
 export function isUsableHallStatus(status: string): boolean {
   return status === "active" || status === "pending";
@@ -84,6 +88,7 @@ export type OrganizationDraftInput = {
   legalAddress?: string | null;
   billingEmail?: string | null;
   billingPhone?: string | null;
+  bankDetails?: Record<string, unknown> | null;
 };
 
 export class OrganizationDraftUpdateError extends Error {
@@ -96,107 +101,432 @@ export class OrganizationDraftUpdateError extends Error {
   }
 }
 
-export async function ensureDraftOrganization(
+async function venueOnboardingAccountConflict(
+  user: AppUser,
+  executor: typeof db,
+): Promise<"PRIVILEGED_ROLE_LOCKED" | "ROLE_CONFLICT" | null> {
+  // Global administrators retain their existing administrative bypass. The
+  // editor role is not a global admin and, like the role picker, cannot turn
+  // itself into an organization owner through a direct API call.
+  if (user.isGlobalAdmin) return null;
+  if (user.role === "editor") return "PRIVILEGED_ROLE_LOCKED";
+  if (user.role === "artist") return "ROLE_CONFLICT";
+  const [artist] = await executor
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.userId, user.id))
+    .limit(1);
+  return artist ? "ROLE_CONFLICT" : null;
+}
+
+async function organizationAllowsVenueWrites(
+  organizationId: number,
+  executor: typeof db,
+): Promise<boolean> {
+  const [organization] = await executor
+    .select({ status: partnerOrganizations.status })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, organizationId))
+    .for("update")
+    .limit(1);
+  return Boolean(
+    organization
+    && ORG_STATUSES_ALLOWING_ACCESS.includes(
+      organization.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+    ),
+  );
+}
+
+type OrganizationRow = typeof partnerOrganizations.$inferSelect;
+type OrganizationPatch = ReturnType<typeof organizationPatchSchema.parse>;
+type OrganizationPatchOutcome =
+  | { kind: "updated"; organization: OrganizationRow }
+  | { kind: "missing" }
+  | { kind: "not_editable" }
+  | { kind: "frozen" }
+  | { kind: "phone_error"; message: string };
+
+function organizationCreateValues(input?: OrganizationDraftInput) {
+  return {
+    type: input?.type ?? "company",
+    displayName: input?.displayName?.trim() || "Organizație nouă",
+    legalName: emptyToNull(input?.legalName),
+    idNumber: emptyToNull(input?.idNumber),
+    legalAddress: emptyToNull(input?.legalAddress),
+    billingEmail: emptyToNull(input?.billingEmail),
+    billingPhone: emptyToNull(input?.billingPhone),
+    bankDetails: input?.bankDetails ?? null,
+  };
+}
+
+async function reopenLegacyVenueForMultiHallOnboarding(
+  executor: typeof db,
+  venueId: number,
+  userId: string | null,
+): Promise<boolean> {
+  // A kill-switch OFF submission can already be pending when it is first
+  // attached after MULTI_HALL turns ON. Reopen only its generated
+  // legacy-default hall: the multi-hall form must be able to add the now-
+  // required capacity/details and submit a fresh review generation.
+  const reopened = await executor
+    .update(venueHalls)
+    .set({ status: "draft", updatedAt: new Date() })
+    .where(and(
+      eq(venueHalls.venueId, venueId),
+      eq(venueHalls.isLegacyDefault, true),
+      eq(venueHalls.status, "pending"),
+    ))
+    .returning({ id: venueHalls.id });
+  const [legacyHall] = await executor
+    .select({ status: venueHalls.status })
+    .from(venueHalls)
+    .where(and(
+      eq(venueHalls.venueId, venueId),
+      eq(venueHalls.isLegacyDefault, true),
+    ))
+    .limit(1);
+  // OFF-era rejection did not consistently reset this legacy user bit. Once
+  // the venue is attached, check-role no longer has the organization-null
+  // safety mask, so every non-active/no-Hall legacy state must remain in
+  // onboarding until it is corrected and submitted again.
+  if (userId && legacyHall?.status !== "active") {
+    await executor
+      .update(users)
+      .set({ onboardingComplete: false, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+  return reopened.length > 0;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+export function organizationCreatePayloadHash(input: OrganizationDraftInput): string {
+  return createHash("sha256")
+    .update(canonicalJson({ version: 1, ...organizationCreateValues(input) }))
+    .digest("hex");
+}
+
+async function findOwnedReusableOrganizationIds(
+  userId: string,
+  executor: typeof db = db,
+): Promise<number[]> {
+  const memberships = await executor
+    .select({ organizationId: partnerOrganizationMembers.organizationId })
+    .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
+    .where(and(
+      eq(partnerOrganizationMembers.userId, userId),
+      eq(partnerOrganizationMembers.role, "owner"),
+      eq(partnerOrganizationMembers.isActive, true),
+      inArray(partnerOrganizations.status, ["draft", "rejected"]),
+    ))
+    .orderBy(asc(partnerOrganizations.id));
+  return memberships.map((membership) => membership.organizationId);
+}
+
+async function loadOwnedReusableOrganization(
+  userId: string,
+  organizationId: number,
+  executor: typeof db,
+): Promise<OrganizationRow | null> {
+  const [membership] = await executor
+    .select({ organizationId: partnerOrganizationMembers.organizationId })
+    .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
+    .where(and(
+      eq(partnerOrganizationMembers.userId, userId),
+      eq(partnerOrganizationMembers.organizationId, organizationId),
+      eq(partnerOrganizationMembers.role, "owner"),
+      eq(partnerOrganizationMembers.isActive, true),
+      inArray(partnerOrganizations.status, ["draft", "rejected"]),
+    ))
+    .limit(1);
+  if (!membership) return null;
+  const [organization] = await executor
+    .select()
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, organizationId))
+    .for("update")
+    .limit(1);
+  return organization ?? null;
+}
+
+async function applyOrganizationPatchLocked(
+  executor: typeof db,
+  organizationId: number,
+  data: OrganizationPatch,
+  present: (key: string) => boolean,
+  options: { allowedStatuses?: readonly string[] },
+): Promise<OrganizationPatchOutcome> {
+  const [current] = await executor
+    .select()
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, organizationId))
+    .for("update")
+    .limit(1);
+  if (!current) return { kind: "missing" };
+  if (options.allowedStatuses && !options.allowedStatuses.includes(current.status)) {
+    return { kind: "not_editable" };
+  }
+
+  const signed = await organizationHasAnyAcceptance(organizationId, executor);
+  const nextType = present("type") ? data.type ?? current.type : current.type;
+  const nextLegalName = present("legalName") ? emptyToNull(data.legalName) : current.legalName;
+  const nextIdNumber = present("idNumber") ? emptyToNull(data.idNumber) : current.idNumber;
+  const nextLegalAddress = present("legalAddress")
+    ? emptyToNull(data.legalAddress)
+    : current.legalAddress;
+  if (
+    signed &&
+    (nextType !== current.type ||
+      (nextLegalName ?? null) !== (current.legalName ?? null) ||
+      (nextIdNumber ?? null) !== (current.idNumber ?? null) ||
+      (nextLegalAddress ?? null) !== (current.legalAddress ?? null))
+  ) {
+    return { kind: "frozen" };
+  }
+
+  let billingPhone = data.billingPhone;
+  if (present("billingPhone") && billingPhone) {
+    const phone = validatePhoneOrError(billingPhone);
+    if (!phone.ok) return { kind: "phone_error", message: phone.message };
+    billingPhone = phone.e164;
+  }
+
+  const set: Partial<typeof partnerOrganizations.$inferInsert> = { updatedAt: new Date() };
+  if (present("type") && data.type) set.type = data.type;
+  if (present("displayName") && data.displayName) set.displayName = data.displayName;
+  if (present("legalName")) set.legalName = emptyToNull(data.legalName);
+  if (present("idNumber")) set.idNumber = emptyToNull(data.idNumber);
+  if (present("legalAddress")) set.legalAddress = emptyToNull(data.legalAddress);
+  if (present("billingEmail")) set.billingEmail = emptyToNull(data.billingEmail);
+  if (present("billingPhone")) set.billingPhone = emptyToNull(billingPhone);
+  if (present("bankDetails")) set.bankDetails = data.bankDetails ?? current.bankDetails;
+
+  const [organization] = await executor
+    .update(partnerOrganizations)
+    .set(set)
+    .where(eq(partnerOrganizations.id, organizationId))
+    .returning();
+  return organization ? { kind: "updated", organization } : { kind: "missing" };
+}
+
+function organizationPatchFailure(outcome: Exclude<OrganizationPatchOutcome, { kind: "updated" }>) {
+  if (outcome.kind === "missing") {
+    return { ok: false as const, error: "Not found", status: 404 as const };
+  }
+  if (outcome.kind === "not_editable") {
+    return { ok: false as const, error: "ORGANIZATION_NOT_EDITABLE", status: 409 as const };
+  }
+  if (outcome.kind === "frozen") {
+    return {
+      ok: false as const,
+      error: "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION",
+      status: 409 as const,
+    };
+  }
+  return {
+    ok: false as const,
+    error: outcome.message,
+    field: "billingPhone" as const,
+    status: 400 as const,
+  };
+}
+
+/**
+ * Bootstrap/resume used only when a venue role is selected for the first time.
+ * It never treats form input as a PATCH: one eligible OWNER draft is returned
+ * byte-for-byte as persisted, zero creates one, and ambiguity is explicit.
+ */
+export async function bootstrapDraftOrganization(
   user: AppUser,
   input?: OrganizationDraftInput,
 ) {
-  const existing = await listAccessibleOrganizations(user.id);
-  const reusable = existing.find((org) => ELIGIBLE_DRAFT_STATUSES.has(org.status));
-
-  const loadReusable = async () => {
-    if (!reusable) return null;
-    const [row] = await db
-      .select()
-      .from(partnerOrganizations)
-      .where(eq(partnerOrganizations.id, reusable.id))
-      .limit(1);
-    return row ?? null;
-  };
-
-  if (reusable && !input) {
-    const row = await loadReusable();
-    if (row) return row;
-  }
-
-  if (reusable && input) {
-    const access = await authorizeOrganizationCapability(
-      user,
-      reusable.id,
-      organizationWriteCapability(input),
-    );
-    if (!access.ok) {
-      const row = await loadReusable();
-      if (row) return row;
-    } else {
-      const saved = await saveOrganizationProfile(reusable.id, input, {
-        allowedStatuses: ["draft", "rejected"],
-      });
-      if (saved.ok && saved.organization) return saved.organization;
-      if (!saved.ok && saved.error === "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION") {
-        throw new OrganizationDraftUpdateError(saved.error, saved.status ?? 409);
-      }
-      if (!saved.ok && saved.error !== "ORGANIZATION_NOT_EDITABLE") {
-        throw new OrganizationDraftUpdateError(saved.error, saved.status ?? 400);
-      }
-      const row = await loadReusable();
-      if (row) return row;
-    }
-  }
-
-  const displayName = input?.displayName?.trim() || "Organizație nouă";
   return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
     // Creating an owner membership is an authorization mutation too. Use the
     // same user-first lock order as signing, transfers and account deletion so
     // a stale request cannot grant ownership after the user was deleted.
-    await acquireLegalScopeLock(tx, { userId: user.id });
-    const currentUser = await getAppUserById(user.id, tx as unknown as typeof db);
+    await acquireLegalScopeLocks(tx, { userIds: [user.id] });
+    const currentUser = await getLockedAppUserById(user.id, executor);
     if (!currentUser) {
       throw new OrganizationDraftUpdateError("FORBIDDEN", 403);
     }
-
-    // A concurrent first request may have created the draft while this one
-    // waited on the user lock. Re-read inside the serialized section so the
-    // idempotent API never creates two organizations for the same retry.
-    const [concurrentMembership] = await tx
-      .select({ organizationId: partnerOrganizationMembers.organizationId })
-      .from(partnerOrganizationMembers)
-      .innerJoin(
-        partnerOrganizations,
-        eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
-      )
-      .where(and(
-        eq(partnerOrganizationMembers.userId, user.id),
-        eq(partnerOrganizationMembers.isActive, true),
-        inArray(partnerOrganizations.status, ["draft", "rejected"]),
-      ))
-      .orderBy(asc(partnerOrganizations.id))
-      .limit(1);
-    if (concurrentMembership) {
-      const [organization] = await tx
-        .select()
-        .from(partnerOrganizations)
-        .where(eq(partnerOrganizations.id, concurrentMembership.organizationId))
-        .limit(1);
-      if (organization) return organization;
+    const accountConflict = await venueOnboardingAccountConflict(currentUser, executor);
+    if (accountConflict) {
+      throw new OrganizationDraftUpdateError(accountConflict, 409);
     }
 
-    const [created] = await tx
+    const reusableIds = await findOwnedReusableOrganizationIds(currentUser.id, executor);
+    if (reusableIds.length > 1) {
+      throw new OrganizationDraftUpdateError("ORGANIZATION_SELECTION_REQUIRED", 409);
+    }
+    const reusableId = reusableIds[0];
+    if (reusableId != null) {
+      await acquireLegalScopeLocks(tx, { organizationIds: [reusableId] });
+      const reusable = await loadOwnedReusableOrganization(
+        currentUser.id,
+        reusableId,
+        executor,
+      );
+      if (reusable) {
+        return reusable;
+      }
+    }
+
+    const values = organizationCreateValues(input);
+    const [created] = await executor
       .insert(partnerOrganizations)
       .values({
-        type: input?.type ?? "company",
-        displayName,
+        ...values,
         status: "draft",
-        legalName: emptyToNull(input?.legalName),
-        idNumber: emptyToNull(input?.idNumber),
-        legalAddress: emptyToNull(input?.legalAddress),
-        billingEmail: emptyToNull(input?.billingEmail),
-        billingPhone: emptyToNull(input?.billingPhone),
       })
       .returning();
-    await acquireLegalScopeLock(tx, { organizationId: created.id });
-    await tx.insert(partnerOrganizationMembers).values({
+    await acquireLegalScopeLocks(tx, { organizationIds: [created.id] });
+    await executor.insert(partnerOrganizationMembers).values({
       organizationId: created.id,
-      userId: user.id,
+      userId: currentUser.id,
+      role: "owner",
+      isActive: true,
+    });
+    return created;
+  });
+}
+
+/** Backwards-compatible name; intentionally has bootstrap/resume semantics. */
+export const ensureDraftOrganization = bootstrapDraftOrganization;
+
+/**
+ * Explicit, keyed organization creation. The stored hash represents the
+ * normalized original POST payload and is never recomputed from mutable
+ * profile columns, so a retry still resolves after the profile was edited.
+ * `creationActorUserId` scopes idempotency only; membership is the authority.
+ */
+export async function createDraftOrganization(user: AppUser, raw: unknown) {
+  const parsed = organizationCreateSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new OrganizationDraftUpdateError("Validation failed", 400);
+  }
+
+  const { organizationCreateRequestId, ...profile } = parsed.data;
+  if (profile.billingPhone) {
+    const phone = validatePhoneOrError(profile.billingPhone);
+    if (!phone.ok) {
+      throw new OrganizationDraftUpdateError(phone.message, 400);
+    }
+    profile.billingPhone = phone.e164;
+  }
+  const values = organizationCreateValues(profile);
+  const creationRequestHash = organizationCreatePayloadHash(values);
+
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    await acquireLegalScopeLocks(tx, { userIds: [user.id] });
+    const currentUser = await getLockedAppUserById(user.id, executor);
+    if (!currentUser) {
+      throw new OrganizationDraftUpdateError("FORBIDDEN", 403);
+    }
+    const accountConflict = await venueOnboardingAccountConflict(currentUser, executor);
+    if (accountConflict) {
+      throw new OrganizationDraftUpdateError(accountConflict, 409);
+    }
+
+    const resolvePrior = async () => {
+      // Discover the row id without a row lock, then enter the canonical
+      // user -> organization advisory-lock order before locking either the
+      // organization or its authority proof. The actor/key is only a replay
+      // scope: it never grants access by itself.
+      const [candidate] = await executor
+        .select({ id: partnerOrganizations.id })
+        .from(partnerOrganizations)
+        .where(and(
+          eq(partnerOrganizations.creationActorUserId, currentUser.id),
+          eq(partnerOrganizations.creationRequestId, organizationCreateRequestId),
+        ))
+        .limit(1);
+      if (!candidate) return null;
+
+      await acquireLegalScopeLocks(tx, { organizationIds: [candidate.id] });
+      const [prior] = await executor
+        .select()
+        .from(partnerOrganizations)
+        .where(and(
+          eq(partnerOrganizations.id, candidate.id),
+          eq(partnerOrganizations.creationActorUserId, currentUser.id),
+          eq(partnerOrganizations.creationRequestId, organizationCreateRequestId),
+        ))
+        .for("update")
+        .limit(1);
+      if (!prior) return null;
+      if (!ORG_STATUSES_ALLOWING_ACCESS.includes(
+        prior.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+      )) {
+        throw new OrganizationDraftUpdateError("FORBIDDEN", 403);
+      }
+
+      const [liveOwner] = await executor
+        .select({ id: partnerOrganizationMembers.id })
+        .from(partnerOrganizationMembers)
+        .where(and(
+          eq(partnerOrganizationMembers.organizationId, prior.id),
+          eq(partnerOrganizationMembers.userId, currentUser.id),
+          eq(partnerOrganizationMembers.role, "owner"),
+          eq(partnerOrganizationMembers.isActive, true),
+        ))
+        .for("update")
+        .limit(1);
+      if (!liveOwner) {
+        throw new OrganizationDraftUpdateError("FORBIDDEN", 403);
+      }
+      if (prior.creationRequestHash !== creationRequestHash) {
+        throw new OrganizationDraftUpdateError("IDEMPOTENCY_KEY_REUSED", 409);
+      }
+      return prior;
+    };
+
+    const prior = await resolvePrior();
+    if (prior) return prior;
+
+    const [created] = await executor
+      .insert(partnerOrganizations)
+      .values({
+        ...values,
+        creationActorUserId: currentUser.id,
+        creationRequestId: organizationCreateRequestId,
+        creationRequestHash,
+        status: "draft",
+      })
+      // The user lock serializes current writers. The unique index plus this
+      // conflict-safe retry also covers a rolling deployment or lost response.
+      .onConflictDoNothing()
+      .returning();
+    if (!created) {
+      const concurrent = await resolvePrior();
+      if (concurrent) return concurrent;
+      throw new OrganizationDraftUpdateError("ORGANIZATION_CREATE_CONFLICT", 409);
+    }
+
+    await acquireLegalScopeLocks(tx, { organizationIds: [created.id] });
+    await executor.insert(partnerOrganizationMembers).values({
+      organizationId: created.id,
+      userId: currentUser.id,
       role: "owner",
       isActive: true,
     });
@@ -205,6 +535,7 @@ export async function ensureDraftOrganization(
 }
 
 export async function saveOrganizationProfile(
+  user: AppUser,
   organizationId: number,
   raw: unknown,
   options: { allowedStatuses?: readonly string[] } = {},
@@ -218,82 +549,48 @@ export async function saveOrganizationProfile(
   }
   const data = parsed.data;
   const present = (key: string) => Object.prototype.hasOwnProperty.call(record, key);
-
-  try {
-    const updated = await db.transaction(async (tx) => {
-      await acquireLegalScopeLock(tx, { organizationId });
-      const [current] = await tx
-        .select()
-        .from(partnerOrganizations)
-        .where(eq(partnerOrganizations.id, organizationId))
-        .for("update")
-        .limit(1);
-      if (!current) return { missing: true as const };
-      if (options.allowedStatuses && !options.allowedStatuses.includes(current.status)) {
-        return { notEditable: true as const };
-      }
-
-      const signed = await organizationHasAnyAcceptance(organizationId, tx as unknown as typeof db);
-      const nextType = present("type") ? data.type ?? current.type : current.type;
-      const nextLegalName = present("legalName") ? emptyToNull(data.legalName) : current.legalName;
-      const nextIdNumber = present("idNumber") ? emptyToNull(data.idNumber) : current.idNumber;
-      const nextLegalAddress = present("legalAddress") ? emptyToNull(data.legalAddress) : current.legalAddress;
-      if (
-        signed &&
-        (nextType !== current.type ||
-          (nextLegalName ?? null) !== (current.legalName ?? null) ||
-          (nextIdNumber ?? null) !== (current.idNumber ?? null) ||
-          (nextLegalAddress ?? null) !== (current.legalAddress ?? null))
-      ) {
-        return { frozen: true as const };
-      }
-
-      if (present("billingPhone") && data.billingPhone) {
-        const phone = validatePhoneOrError(data.billingPhone);
-        if (!phone.ok) {
-          return { phoneError: phone.message as string };
-        }
-        data.billingPhone = phone.e164;
-      }
-
-      const set: Record<string, unknown> = { updatedAt: new Date() };
-      if (present("type") && data.type) set.type = data.type;
-      if (present("displayName") && data.displayName) set.displayName = data.displayName;
-      if (present("legalName")) set.legalName = emptyToNull(data.legalName);
-      if (present("idNumber")) set.idNumber = emptyToNull(data.idNumber);
-      if (present("legalAddress")) set.legalAddress = emptyToNull(data.legalAddress);
-      if (present("billingEmail")) set.billingEmail = emptyToNull(data.billingEmail);
-      if (present("billingPhone")) set.billingPhone = emptyToNull(data.billingPhone);
-      if (present("bankDetails")) set.bankDetails = data.bankDetails ?? current.bankDetails;
-
-      const [row] = await tx
-        .update(partnerOrganizations)
-        .set(set)
-        .where(eq(partnerOrganizations.id, organizationId))
-        .returning();
-      return { row };
+  const capability = organizationWriteCapability(raw);
+  const updated = await db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    await acquireLegalScopeLocks(tx, {
+      userIds: [user.id],
+      organizationIds: [organizationId],
     });
+    const currentUser = await getLockedAppUserById(user.id, executor);
+    if (!currentUser) return { kind: "forbidden" as const };
+    const access = await authorizeOrganizationCapabilityLocked(
+      currentUser,
+      organizationId,
+      capability,
+      executor,
+    );
+    if (!access.ok) return { kind: "forbidden" as const };
+    const outcome = await applyOrganizationPatchLocked(
+      executor,
+      organizationId,
+      data,
+      present,
+      options,
+    );
+    return { kind: "authorized" as const, outcome, role: access.role };
+  });
 
-    if ("missing" in updated && updated.missing) {
-      return { ok: false as const, error: "Not found", status: 404 as const };
-    }
-    if ("notEditable" in updated && updated.notEditable) {
-      return { ok: false as const, error: "ORGANIZATION_NOT_EDITABLE", status: 409 as const };
-    }
-    if ("frozen" in updated && updated.frozen) {
-      return {
-        ok: false as const,
-        error: "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION",
-        status: 409 as const,
-      };
-    }
-    if ("phoneError" in updated && updated.phoneError) {
-      return { ok: false as const, error: updated.phoneError, field: "billingPhone", status: 400 as const };
-    }
-    return { ok: true as const, organization: updated.row };
-  } catch (error) {
-    throw error;
+  if (updated.kind === "forbidden") {
+    return {
+      ok: false as const,
+      code: "FORBIDDEN" as const,
+      error: "Forbidden",
+      status: 403 as const,
+    };
   }
+  if (updated.outcome.kind !== "updated") {
+    return organizationPatchFailure(updated.outcome);
+  }
+  return {
+    ok: true as const,
+    organization: updated.outcome.organization,
+    role: updated.role,
+  };
 }
 
 export async function saveVenueDraft(user: AppUser, raw: unknown) {
@@ -307,279 +604,506 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
     return { ok: false as const, error: phone.message, field: "phone", status: 400 as const };
   }
 
-  if (!isMultiHallEnabled()) {
-    const [otherPhone] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.phone, phone.e164)))
-      .limit(1);
-    if (otherPhone && otherPhone.id !== user.id) {
-      return {
-        ok: false as const,
-        code: "phone_in_use" as const,
-        error: "Acest număr de telefon este deja folosit de un alt cont.",
-        field: "phone",
-        status: 409 as const,
-      };
-    }
-  }
-
+  const multiHallEnabled = isMultiHallEnabled();
   const optionalUrl = (value?: string | null) => {
     const trimmed = value?.trim();
     return trimmed ? trimmed : null;
   };
 
-  const syncLegacyUserPhone = async () => {
-    if (isMultiHallEnabled()) return;
-    await db.update(users).set({ phone: phone.e164, updatedAt: new Date() }).where(eq(users.id, user.id));
-  };
+  const createIntent = data.createIntent === true;
+  const createRequestId = createIntent ? data.createRequestId ?? null : null;
+  const imageUrls = data.imageUrls ?? [];
+  const creationPayloadHash = createIntent
+    ? createHash("sha256")
+        .update(JSON.stringify({
+          version: 1,
+          organizationId: data.organizationId,
+          nameRo: data.name,
+          nameRu: emptyToNull(data.nameRu),
+          nameEn: emptyToNull(data.nameEn),
+          descriptionRo: emptyToNull(data.descriptionRo),
+          descriptionRu: emptyToNull(data.descriptionRu),
+          descriptionEn: emptyToNull(data.descriptionEn),
+          phone: phone.e164,
+          email: emptyToNull(data.email),
+          city: data.city,
+          address: data.address,
+          lat: data.lat ?? null,
+          lng: data.lng ?? null,
+          website: optionalUrl(data.websiteUrl),
+          menuUrl: optionalUrl(data.menuUrl),
+          menuPdfUrl: optionalUrl(data.menuPdfUrl),
+          virtualTourUrl: optionalUrl(data.virtualTourUrl),
+          workingHours: data.workingHours ?? null,
+          imageUrls,
+        }))
+        .digest("hex")
+    : null;
+  const saved = await db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
 
-  const updateExisting = async (existing: typeof venues.$inferSelect) => {
-    if (existing.organizationId != null && existing.organizationId !== data.organizationId) {
+    // Membership mutations use this same user → organization lock order.
+    // Re-authorizing inside the lock prevents a removed/demoted member from
+    // finishing a draft write with authority captured before the removal.
+    await acquireLegalScopeLocks(tx, {
+      userIds: [user.id],
+      organizationIds: [data.organizationId],
+    });
+    const currentUser = await getLockedAppUserById(user.id, executor);
+    if (!currentUser) {
       return { ok: false as const, error: "Forbidden", status: 403 as const };
     }
-    const [updated] = await db
-      .update(venues)
-      .set({
-        organizationId: existing.organizationId ?? data.organizationId,
-        nameRo: data.name,
-        nameRu: emptyToNull(data.nameRu),
-        nameEn: emptyToNull(data.nameEn),
-        descriptionRo: emptyToNull(data.descriptionRo),
-        descriptionRu: emptyToNull(data.descriptionRu),
-        descriptionEn: emptyToNull(data.descriptionEn),
-        phone: phone.e164,
-        email: emptyToNull(data.email),
-        city: data.city,
-        address: data.address,
-        lat: data.lat ?? existing.lat,
-        lng: data.lng ?? existing.lng,
-        website: optionalUrl(data.websiteUrl),
-        menuUrl: optionalUrl(data.menuUrl),
-        menuPdfUrl: optionalUrl(data.menuPdfUrl),
-        virtualTourUrl: optionalUrl(data.virtualTourUrl),
-        workingHours: data.workingHours ?? existing.workingHours,
-        updatedAt: new Date(),
-      })
-      .where(eq(venues.id, existing.id))
-      .returning();
-    await replaceVenueImages(existing.id, null, data.imageUrls);
-    await syncLegacyUserPhone();
-    return { ok: true as const, venue: updated };
-  };
+    const accountConflict = await venueOnboardingAccountConflict(currentUser, executor);
+    if (accountConflict) {
+      return {
+        ok: false as const,
+        code: accountConflict,
+        error: accountConflict === "ROLE_CONFLICT"
+          ? "Rolul contului este deja stabilit. Folosește un cont separat pentru alt tip de profil."
+          : "Conturile editor nu pot crea sau modifica profiluri de local.",
+        status: 409 as const,
+      };
+    }
+    if (!multiHallEnabled) {
+      const phoneWrite = await writeUserPhoneLocked(
+        executor,
+        currentUser.id,
+        phone.e164,
+      );
+      if (!phoneWrite.ok) {
+        return {
+          ok: false as const,
+          code: phoneWrite.code === "PHONE_IN_USE"
+            ? "phone_in_use" as const
+            : "USER_NOT_FOUND" as const,
+          error: phoneWrite.code === "PHONE_IN_USE"
+            ? "Acest număr de telefon este deja folosit de un alt cont."
+            : "User not found",
+          field: "phone",
+          status: phoneWrite.code === "PHONE_IN_USE" ? 409 as const : 404 as const,
+        };
+      }
+    }
+    if (!(await organizationAllowsVenueWrites(data.organizationId, executor))) {
+      return {
+        ok: false as const,
+        code: "ORGANIZATION_NOT_EDITABLE" as const,
+        error: "ORGANIZATION_NOT_EDITABLE",
+        status: 409 as const,
+      };
+    }
+    if (multiHallEnabled) {
+      const organizationAccess = await authorizeOrganizationCapabilityLocked(
+        currentUser,
+        data.organizationId,
+        "manage_venues",
+        executor,
+      );
+      if (!organizationAccess.ok) {
+        return { ok: false as const, error: "Forbidden", status: 403 as const };
+      }
+    }
 
-  const createIntent = data.createIntent === true;
-  if (data.venueId) {
-    const [existing] = await db
-      .select()
+    const resolvePriorSubmission = async () => {
+      if (!createIntent || !createRequestId || !creationPayloadHash) return null;
+      const [priorSubmission] = await executor
+        .select()
+        .from(venues)
+        .where(and(
+          eq(venues.organizationId, data.organizationId),
+          eq(venues.onboardingSubmissionId, createRequestId),
+        ))
+        .limit(1);
+      if (!priorSubmission) return null;
+      if (priorSubmission.onboardingSubmissionHash !== creationPayloadHash) {
+        return {
+          ok: false as const,
+          code: "IDEMPOTENCY_KEY_REUSED" as const,
+          error: "IDEMPOTENCY_KEY_REUSED",
+          status: 409 as const,
+        };
+      }
+      return { ok: true as const, venue: priorSubmission, reopenedLegacyHall: false };
+    };
+
+    if (createIntent) {
+      // venueDraftSchema requires the UUID, but retain a defensive runtime
+      // check because this is the durable write boundary.
+      if (!createRequestId || !creationPayloadHash) {
+        return {
+          ok: false as const,
+          error: "Validation failed",
+          status: 400 as const,
+        };
+      }
+      const priorSubmission = await resolvePriorSubmission();
+      if (priorSubmission) {
+        return priorSubmission;
+      }
+    }
+
+    let existing: typeof venues.$inferSelect | undefined;
+    if (data.venueId) {
+      [existing] = await executor
+        .select()
+        .from(venues)
+        .where(eq(venues.id, data.venueId))
+        .for("update")
+        .limit(1);
+    } else if (!createIntent) {
+      // user_id remains unique during the expand phase. If it points at an
+      // organization-backed venue, the checks below still require the exact
+      // organization and (with the flag on) a live capability.
+      [existing] = await executor
+        .select()
+        .from(venues)
+        .where(eq(venues.userId, currentUser.id))
+        .for("update")
+        .limit(1);
+    }
+
+    if (existing) {
+      const attachingLegacyVenue = existing.organizationId == null;
+      if (existing.organizationId != null && existing.organizationId !== data.organizationId) {
+        return { ok: false as const, error: "Forbidden", status: 403 as const };
+      }
+      if (
+        existing.organizationId == null &&
+        !currentUser.isGlobalAdmin &&
+        existing.userId !== currentUser.id
+      ) {
+        return { ok: false as const, error: "Forbidden", status: 403 as const };
+      }
+      if (
+        !multiHallEnabled &&
+        existing.organizationId != null &&
+        !currentUser.isGlobalAdmin &&
+        existing.userId !== currentUser.id
+      ) {
+        return { ok: false as const, error: "Forbidden", status: 403 as const };
+      }
+
+      // The ownership/organization predicate belongs in the UPDATE itself,
+      // not only in the preceding SELECT. A forged id or a row changed while
+      // the request was waiting therefore updates zero rows instead of being
+      // attached to the caller's organization.
+      const ownershipCondition = existing.organizationId == null
+        ? currentUser.isGlobalAdmin
+          ? and(eq(venues.id, existing.id), isNull(venues.organizationId))
+          : and(
+              eq(venues.id, existing.id),
+              isNull(venues.organizationId),
+              eq(venues.userId, currentUser.id),
+            )
+        : multiHallEnabled || currentUser.isGlobalAdmin
+          ? and(
+              eq(venues.id, existing.id),
+              eq(venues.organizationId, data.organizationId),
+            )
+          : and(
+              eq(venues.id, existing.id),
+              eq(venues.organizationId, data.organizationId),
+              eq(venues.userId, currentUser.id),
+            );
+      const [updated] = await executor
+        .update(venues)
+        .set({
+          organizationId: existing.organizationId ?? data.organizationId,
+          nameRo: data.name,
+          nameRu: data.nameRu === undefined ? existing.nameRu : emptyToNull(data.nameRu),
+          nameEn: data.nameEn === undefined ? existing.nameEn : emptyToNull(data.nameEn),
+          descriptionRo: data.descriptionRo === undefined
+            ? existing.descriptionRo
+            : emptyToNull(data.descriptionRo),
+          descriptionRu: data.descriptionRu === undefined
+            ? existing.descriptionRu
+            : emptyToNull(data.descriptionRu),
+          descriptionEn: data.descriptionEn === undefined
+            ? existing.descriptionEn
+            : emptyToNull(data.descriptionEn),
+          phone: phone.e164,
+          email: data.email === undefined ? existing.email : emptyToNull(data.email),
+          city: data.city,
+          address: data.address,
+          lat: data.lat ?? existing.lat,
+          lng: data.lng ?? existing.lng,
+          website: data.websiteUrl === undefined ? existing.website : optionalUrl(data.websiteUrl),
+          menuUrl: data.menuUrl === undefined ? existing.menuUrl : optionalUrl(data.menuUrl),
+          menuPdfUrl: data.menuPdfUrl === undefined ? existing.menuPdfUrl : optionalUrl(data.menuPdfUrl),
+          virtualTourUrl: data.virtualTourUrl === undefined
+            ? existing.virtualTourUrl
+            : optionalUrl(data.virtualTourUrl),
+          workingHours: data.workingHours ?? existing.workingHours,
+          updatedAt: new Date(),
+        })
+        .where(ownershipCondition)
+        .returning();
+      if (!updated) {
+        return { ok: false as const, error: "Forbidden", status: 403 as const };
+      }
+      const reopenedLegacyHall = attachingLegacyVenue
+        ? await reopenLegacyVenueForMultiHallOnboarding(
+          executor,
+          updated.id,
+          existing.userId,
+        )
+        : false;
+      if (data.imageUrls !== undefined) {
+        await replaceVenueImages(updated.id, null, imageUrls, executor);
+      }
+      return { ok: true as const, venue: updated, reopenedLegacyHall };
+    }
+
+    if (data.venueId) {
+      // Do not turn a stale/forged explicit id into an implicit create.
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+
+    // The slug is globally unique. Different users/organizations do not share
+    // a legal-scope lock, so SELECT-then-INSERT alone can still race. Insert
+    // with ON CONFLICT DO NOTHING and re-evaluate the candidate in a bounded
+    // loop; PostgreSQL keeps the transaction usable and RETURNING tells us
+    // which contender won without catching 23505 in an aborted transaction.
+    for (let attempt = 0; attempt < 64; attempt += 1) {
+      const owned = createIntent
+        ? undefined
+        : (await executor
+            .select({ id: venues.id })
+            .from(venues)
+            .where(eq(venues.userId, currentUser.id))
+            .limit(1))[0];
+      const slug = await uniqueVenueSlug(data.name, undefined, executor);
+      const [created] = await executor
+        .insert(venues)
+        .values({
+          // Explicit "Add venue" rows are organization-owned only. The
+          // legacy user pointer belongs solely to the role-picker stub/legacy
+          // first-venue path and must never grant one co-owner a back door to
+          // an additional venue in the same organization.
+          userId: createIntent ? null : owned ? null : currentUser.id,
+          organizationId: data.organizationId,
+          onboardingSubmissionId: createRequestId,
+          onboardingSubmissionHash: creationPayloadHash,
+          nameRo: data.name,
+          nameRu: emptyToNull(data.nameRu),
+          nameEn: emptyToNull(data.nameEn),
+          descriptionRo: emptyToNull(data.descriptionRo),
+          descriptionRu: emptyToNull(data.descriptionRu),
+          descriptionEn: emptyToNull(data.descriptionEn),
+          slug,
+          phone: phone.e164,
+          email: emptyToNull(data.email),
+          city: data.city,
+          address: data.address,
+          lat: data.lat ?? null,
+          lng: data.lng ?? null,
+          website: optionalUrl(data.websiteUrl),
+          menuUrl: optionalUrl(data.menuUrl),
+          menuPdfUrl: optionalUrl(data.menuPdfUrl),
+          virtualTourUrl: optionalUrl(data.virtualTourUrl),
+          workingHours: data.workingHours ?? null,
+          isActive: false,
+          isFeatured: true,
+          facilities: [],
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (created) {
+        await replaceVenueImages(created.id, null, imageUrls, executor);
+        return { ok: true as const, venue: created, reopenedLegacyHall: false };
+      }
+
+      // An empty RETURNING can also mean the organization-scoped idempotency
+      // index won in another request. Recover that exact row (or reject a key
+      // reused with another payload) before trying a new slug.
+      const priorSubmission = await resolvePriorSubmission();
+      if (priorSubmission) return priorSubmission;
+    }
+
+    return {
+      ok: false as const,
+      code: "VENUE_CREATE_CONFLICT" as const,
+      error: "VENUE_CREATE_CONFLICT",
+      status: 409 as const,
+    };
+  });
+
+  return saved;
+}
+
+/**
+ * Attach the legacy venue stub created by the role picker to an organization.
+ * Organization-backed venues are verification-only here: they can never be
+ * reparented through the stale legacy `venues.user_id` column.
+ */
+export async function attachVenueRoleDraftToOrganization(
+  user: AppUser,
+  venueId: number,
+  organizationId: number,
+) {
+  if (
+    !Number.isInteger(venueId) ||
+    venueId <= 0 ||
+    !Number.isInteger(organizationId) ||
+    organizationId <= 0
+  ) {
+    return { ok: false as const, error: "Forbidden", status: 403 as const };
+  }
+
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    await acquireLegalScopeLocks(tx, {
+      userIds: [user.id],
+      organizationIds: [organizationId],
+    });
+    const currentUser = await getLockedAppUserById(user.id, executor);
+    if (!currentUser) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+    const accountConflict = await venueOnboardingAccountConflict(currentUser, executor);
+    if (accountConflict) {
+      return { ok: false as const, error: accountConflict, status: 409 as const };
+    }
+    if (!(await organizationAllowsVenueWrites(organizationId, executor))) {
+      return {
+        ok: false as const,
+        error: "ORGANIZATION_NOT_EDITABLE",
+        status: 409 as const,
+      };
+    }
+
+    const [existing] = await executor
+      .select({
+        id: venues.id,
+        userId: venues.userId,
+        organizationId: venues.organizationId,
+      })
       .from(venues)
-      .where(eq(venues.id, data.venueId))
+      .where(eq(venues.id, venueId))
+      .for("update")
       .limit(1);
     if (!existing) {
       return { ok: false as const, error: "Forbidden", status: 403 as const };
     }
-    return updateExisting(existing);
-  }
-  if (!createIntent) {
-    const [ownedStub] = await db
-      .select()
-      .from(venues)
-      .where(eq(venues.userId, user.id))
-      .limit(1);
-    if (ownedStub) {
-      return updateExisting(ownedStub);
-    }
-  }
 
-  const slug = await uniqueVenueSlug(data.name);
-  const [owned] = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.userId, user.id))
-    .limit(1);
-  const [created] = await db
-    .insert(venues)
-    .values({
-      userId: owned ? null : user.id,
-      organizationId: data.organizationId,
-      nameRo: data.name,
-      nameRu: emptyToNull(data.nameRu),
-      nameEn: emptyToNull(data.nameEn),
-      slug,
-      phone: phone.e164,
-      email: emptyToNull(data.email),
-      city: data.city,
-      address: data.address,
-      lat: data.lat ?? null,
-      lng: data.lng ?? null,
-      website: optionalUrl(data.websiteUrl),
-      menuUrl: optionalUrl(data.menuUrl),
-      menuPdfUrl: optionalUrl(data.menuPdfUrl),
-      virtualTourUrl: optionalUrl(data.virtualTourUrl),
-      workingHours: data.workingHours ?? null,
-      isActive: false,
-      isFeatured: true,
-      facilities: [],
-    })
-    .returning();
-  await replaceVenueImages(created.id, null, data.imageUrls);
-  await syncLegacyUserPhone();
-  return { ok: true as const, venue: created };
+    if (existing.organizationId != null && existing.organizationId !== organizationId) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+    if (
+      existing.organizationId == null &&
+      !currentUser.isGlobalAdmin &&
+      existing.userId !== currentUser.id
+    ) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+
+    const access = await authorizeOrganizationCapabilityLocked(
+      currentUser,
+      organizationId,
+      "manage_venues",
+      executor,
+    );
+    if (!access.ok) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+
+    if (existing.organizationId != null) {
+      // Already attached to this exact organization. Live authorization was
+      // checked above; importantly, no UPDATE can move it anywhere else.
+      return { ok: true as const, venueId: existing.id, organizationId };
+    }
+
+    const ownershipCondition = currentUser.isGlobalAdmin
+      ? and(eq(venues.id, existing.id), isNull(venues.organizationId))
+      : and(
+          eq(venues.id, existing.id),
+          isNull(venues.organizationId),
+          eq(venues.userId, currentUser.id),
+        );
+    const [attached] = await executor
+      .update(venues)
+      .set({ organizationId, updatedAt: new Date() })
+      .where(ownershipCondition)
+      .returning({ id: venues.id });
+    if (!attached) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+    const reopenedLegacyHall = await reopenLegacyVenueForMultiHallOnboarding(
+      executor,
+      attached.id,
+      existing.userId,
+    );
+    return {
+      ok: true as const,
+      venueId: attached.id,
+      organizationId,
+      reopenedLegacyHall,
+    };
+  });
 }
 
 export async function replaceVenueImages(
   venueId: number,
   hallId: number | null,
   urls: string[],
+  executor: typeof db = db,
 ) {
-  if (hallId != null) {
-    assertMultiHallMutationsAllowed();
-  }
-  const existing = await db
+  const existing = await executor
     .select({ id: venueImages.id, hallId: venueImages.hallId, url: venueImages.url })
     .from(venueImages)
-    .where(eq(venueImages.venueId, venueId));
-  const toRemove = existing.filter((row) => (row.hallId ?? null) === hallId);
-  if (toRemove.length) {
-    await db.delete(venueImages).where(inArray(venueImages.id, toRemove.map((row) => row.id)));
+    .where(eq(venueImages.venueId, venueId))
+    .orderBy(asc(venueImages.sortOrder), asc(venueImages.id))
+    .for("update");
+  const scoped = existing.filter((row) => (row.hallId ?? null) === hallId);
+
+  // Reconcile by URL instead of deleting the complete gallery. Existing IDs
+  // and translated alt text remain intact for retained images, while order
+  // and cover status follow the explicit client list.
+  if (hallId == null && scoped.length > 0) {
+    await executor
+      .update(venueImages)
+      .set({ isCover: false })
+      .where(and(eq(venueImages.venueId, venueId), isNull(venueImages.hallId)));
   }
-  if (!urls.length) return;
-  await db.insert(venueImages).values(
-    urls.map((url, index) => ({
+  const availableByUrl = new Map<string, typeof scoped>();
+  for (const row of scoped) {
+    availableByUrl.set(row.url, [...(availableByUrl.get(row.url) ?? []), row]);
+  }
+  const retainedIds: number[] = [];
+  for (const [sortOrder, url] of urls.entries()) {
+    const candidates = availableByUrl.get(url) ?? [];
+    const retained = candidates.shift();
+    availableByUrl.set(url, candidates);
+    if (retained) {
+      retainedIds.push(retained.id);
+      await executor
+        .update(venueImages)
+        .set({ sortOrder, isCover: hallId == null && sortOrder === 0 })
+        .where(eq(venueImages.id, retained.id));
+      continue;
+    }
+    await executor.insert(venueImages).values({
       venueId,
       hallId,
       url,
-      sortOrder: index,
-      isCover: hallId == null && index === 0,
-    })),
-  );
+      sortOrder,
+      isCover: hallId == null && sortOrder === 0,
+    });
+  }
+  const toRemove = scoped.filter((row) => !retainedIds.includes(row.id));
+  if (toRemove.length) {
+    await executor
+      .delete(venueImages)
+      .where(inArray(venueImages.id, toRemove.map((row) => row.id)));
+  }
 }
 
-export async function saveHallDraft(raw: unknown) {
-  const parsed = hallDraftSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { ok: false as const, error: "Validation failed", details: parsed.error.issues, status: 400 as const };
-  }
-  const data = parsed.data;
-  const [venue] = await db
-    .select({ id: venues.id, capacityMin: venues.capacityMin, capacityMax: venues.capacityMax })
-    .from(venues)
-    .where(eq(venues.id, data.venueId))
-    .limit(1);
-  if (!venue) return { ok: false as const, error: "Venue not found", status: 404 as const };
-
-  const values = {
-    nameRo: data.nameRo,
-    nameRu: emptyToNull(data.nameRu),
-    nameEn: emptyToNull(data.nameEn),
-    descriptionRo: emptyToNull(data.descriptionRo),
-    descriptionRu: emptyToNull(data.descriptionRu),
-    descriptionEn: emptyToNull(data.descriptionEn),
-    capacityMin: data.capacityMin ?? null,
-    capacityMax: data.capacityMax ?? null,
-    pricingModel: data.pricingModel,
-    basePrice: data.basePrice ?? null,
-    minimumOrder: data.minimumOrder ?? null,
-    currency: data.currency,
-    depositType: data.depositType,
-    depositValue: data.depositValue ?? null,
-    facilities: data.facilities,
-    workingHours: data.workingHours ?? null,
-    bufferMinutes: data.bufferMinutes ?? null,
-    bookingTermsRo: emptyToNull(data.bookingTermsRo),
-    bookingTermsRu: emptyToNull(data.bookingTermsRu),
-    bookingTermsEn: emptyToNull(data.bookingTermsEn),
-    sortOrder: data.sortOrder ?? 0,
-    updatedAt: new Date(),
-  };
-
-  if (data.hallId) {
-    const [existing] = await db
-      .select({ id: venueHalls.id, venueId: venueHalls.venueId, status: venueHalls.status })
-      .from(venueHalls)
-      .where(eq(venueHalls.id, data.hallId))
-      .limit(1);
-    if (!existing || existing.venueId !== data.venueId) {
-      return { ok: false as const, error: "Forbidden", status: 403 as const };
-    }
-    const [updated] = await db
-      .update(venueHalls)
-      .set(values)
-      .where(eq(venueHalls.id, existing.id))
-      .returning();
-    await replaceVenueImages(data.venueId, existing.id, data.imageUrls);
-    await replaceSeating(existing.id, data.seating);
-    return { ok: true as const, hall: updated };
-  }
-
-  const [sameName] = await db
-    .select()
-    .from(venueHalls)
-    .where(and(eq(venueHalls.venueId, data.venueId), eq(venueHalls.nameRo, data.nameRo)))
-    .limit(1);
-  if (sameName) {
-    return saveHallDraft({ ...data, hallId: sameName.id });
-  }
-
-  const slug = data.slug?.trim() || (await uniqueHallSlug(data.venueId, data.nameRo));
-  const [created] = await db
-    .insert(venueHalls)
-    .values({
-      venueId: data.venueId,
-      slug,
-      status: "draft",
-      isLegacyDefault: false,
-      ...values,
-    })
-    .returning();
-  await replaceVenueImages(data.venueId, created.id, data.imageUrls);
-  await replaceSeating(created.id, data.seating);
-  if (venue.capacityMin == null && venue.capacityMax == null) {
-    await db
-      .update(venues)
-      .set({ capacityMin: data.capacityMin, capacityMax: data.capacityMax, updatedAt: new Date() })
-      .where(eq(venues.id, data.venueId));
-  }
-  return { ok: true as const, hall: created };
-}
-
-async function replaceSeating(
-  hallId: number,
-  seating: Array<{
-    type: "banquet" | "theatre" | "classroom" | "cocktail" | "u_shape" | "custom";
-    labelRo?: string | null;
-    labelRu?: string | null;
-    labelEn?: string | null;
-    capacityMin?: number | null;
-    capacityMax?: number | null;
-    notesRo?: string | null;
-    notesRu?: string | null;
-    notesEn?: string | null;
-  }>,
-) {
-  const { venueHallSeatingOptions } = await import("@/lib/db/schema");
-  await db.delete(venueHallSeatingOptions).where(eq(venueHallSeatingOptions.hallId, hallId));
-  if (!seating.length) return;
-  await db.insert(venueHallSeatingOptions).values(
-    seating.map((option, index) => ({
-      hallId,
-      type: option.type,
-      labelRo: emptyToNull(option.labelRo),
-      labelRu: emptyToNull(option.labelRu),
-      labelEn: emptyToNull(option.labelEn),
-      capacityMin: option.capacityMin ?? null,
-      capacityMax: option.capacityMax ?? null,
-      notesRo: emptyToNull(option.notesRo),
-      notesRu: emptyToNull(option.notesRu),
-      notesEn: emptyToNull(option.notesEn),
-      sortOrder: index,
-    })),
-  );
-}
-
-export async function collectSubmitMissing(venueId: number): Promise<MissingField[]> {
+export async function collectSubmitMissing(
+  venueId: number,
+  executor: typeof db = db,
+): Promise<MissingField[]> {
   const missing: MissingField[] = [];
-  const [venue] = await db.select().from(venues).where(eq(venues.id, venueId)).limit(1);
+  const [venue] = await executor.select().from(venues).where(eq(venues.id, venueId)).limit(1);
   if (!venue) {
     return [{ step: "venue", field: "venue", message: "venue_required", path: "venue" }];
   }
@@ -587,7 +1111,7 @@ export async function collectSubmitMissing(venueId: number): Promise<MissingFiel
     missing.push({ step: "organization", field: "organizationId", message: "organization_required", path: "organizationId" });
     return missing;
   }
-  const [org] = await db
+  const [org] = await executor
     .select()
     .from(partnerOrganizations)
     .where(eq(partnerOrganizations.id, venue.organizationId))
@@ -607,7 +1131,7 @@ export async function collectSubmitMissing(venueId: number): Promise<MissingFiel
       legalAddress: org.legalAddress,
     }),
   );
-  if (!(await organizationHasValidContract(org.id))) {
+  if (!(await organizationHasValidContract(org.id, executor))) {
     missing.push({ step: "contract", field: "contract", message: "current_signed_contract_required", path: "contract" });
   }
   if (!venue.nameRo || venue.nameRo.trim().length < 2) {
@@ -619,14 +1143,14 @@ export async function collectSubmitMissing(venueId: number): Promise<MissingFiel
   if (!venue.city) {
     missing.push({ step: "venue", field: "city", message: "city_required", path: "city" });
   }
-  const images = await db
+  const images = await executor
     .select({ id: venueImages.id, hallId: venueImages.hallId })
     .from(venueImages)
     .where(eq(venueImages.venueId, venueId));
   if (!images.some((image) => image.hallId == null)) {
     missing.push({ step: "venue", field: "imageUrls", message: "images_required", path: "imageUrls" });
   }
-  const halls = await db
+  const halls = await executor
     .select()
     .from(venueHalls)
     .where(eq(venueHalls.venueId, venueId))
@@ -650,65 +1174,317 @@ export async function collectSubmitMissing(venueId: number): Promise<MissingFiel
   return missing;
 }
 
-export async function submitVenueForApproval(venueId: number) {
-  const missing = await collectSubmitMissing(venueId);
-  if (missing.length) {
-    return { ok: false as const, code: "ONBOARDING_INCOMPLETE" as const, missing, status: 400 as const };
-  }
-  const [venue] = await db.select().from(venues).where(eq(venues.id, venueId)).limit(1);
-  if (!venue?.organizationId) {
-    return { ok: false as const, code: "ONBOARDING_INCOMPLETE" as const, missing, status: 400 as const };
-  }
-  await db
-    .update(partnerOrganizations)
-    .set({ status: "pending", updatedAt: new Date() })
-    .where(and(eq(partnerOrganizations.id, venue.organizationId), inArray(partnerOrganizations.status, ["draft", "rejected"])));
-  const halls = await db.select({ id: venueHalls.id, status: venueHalls.status }).from(venueHalls).where(eq(venueHalls.venueId, venueId));
-  for (const hall of halls) {
-    if (hall.status === "draft" || hall.status === "rejected") {
-      await db.update(venueHalls).set({ status: "pending", updatedAt: new Date() }).where(eq(venueHalls.id, hall.id));
-    }
-  }
-  if (!venue.isActive) {
-    await db.update(venues).set({ isActive: false, updatedAt: new Date() }).where(eq(venues.id, venueId));
-  }
-  return { ok: true as const, venueId, organizationId: venue.organizationId };
+/**
+ * One stable identity for a review generation. Submit and approve only move
+ * hall statuses forward, so they deliberately preserve hall `updatedAt`;
+ * rejection or an actual hall edit changes it and therefore creates a fresh
+ * generation. Image row versions cover required venue-image edits without
+ * coupling the key to the status-only xmin changes.
+ */
+function registrationSubmissionKey(snapshot: VenueRegistrationSnapshot): string {
+  const stablePreTransitionState = JSON.stringify({
+    venueId: snapshot.venue.id,
+    halls: snapshot.halls.map((hall) => [hall.id, hall.updatedAt.toISOString()]),
+    images: snapshot.images.map((image) => [image.id, image.hallId, image.rowVersion]),
+  });
+  return createHash("sha256").update(stablePreTransitionState).digest("hex").slice(0, 24);
 }
 
-export async function archiveHall(hallId: number) {
+export async function submitVenueForApproval(actorUserId: string, venueId: number) {
+  const expected = await captureVenueRegistrationSnapshot(venueId);
+  if (!expected) {
+    return {
+      ok: false as const,
+      code: "NOT_FOUND" as const,
+      error: "Not found",
+      status: 404 as const,
+    };
+  }
+  const submissionKey = registrationSubmissionKey(expected);
+
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+
+    // Membership mutations use this same deterministic user -> organization
+    // lock order. Authority is checked again only after these locks are held,
+    // so revoke/demote/suspend versus submit has a deterministic winner.
+    await acquireLegalScopeLocks(tx, {
+      // Attachment can reset the legacy venue owner's onboarding bit even
+      // when a different organization admin later submits the venue. Lock and
+      // repair both identities so that owner cannot remain redirected forever.
+      userIds: [
+        actorUserId,
+        ...(expected.venue.userId && expected.venue.userId !== actorUserId
+          ? [expected.venue.userId]
+          : []),
+      ],
+      organizationIds: expected.venue.organizationId == null
+        ? []
+        : [expected.venue.organizationId],
+    });
+
+    // archive and admin decisions take this same venue lock after their legal
+    // locks. No transition may observe a stale hall/registration state.
+    await acquireAvailabilityLocks(tx, {
+      venueId,
+      hallIds: [],
+      localDates: [],
+      conflictGroupIds: [],
+    });
+
+    const actor = await getLockedAppUserById(actorUserId, executor);
+    if (!actor) {
+      return {
+        ok: false as const,
+        code: "FORBIDDEN" as const,
+        error: "Forbidden",
+        status: 403 as const,
+      };
+    }
+    const current = await loadLockedVenueRegistrationSnapshot(venueId, executor);
+    if (!current) {
+      return {
+        ok: false as const,
+        code: "NOT_FOUND" as const,
+        error: "Not found",
+        status: 404 as const,
+      };
+    }
+    if (!venueRegistrationSnapshotMatches(expected, current)) {
+      return {
+        ok: false as const,
+        code: "REGISTRATION_CHANGED" as const,
+        error: "REGISTRATION_CHANGED",
+        status: 409 as const,
+      };
+    }
+    if (!current.venue.organizationId) {
+      return {
+        ok: false as const,
+        code: "FORBIDDEN" as const,
+        error: "Forbidden",
+        status: 403 as const,
+      };
+    }
+    const access = await authorizeOrganizationCapabilityLocked(
+      actor,
+      current.venue.organizationId,
+      "manage_venues",
+      executor,
+    );
+    if (!access.ok) {
+      return {
+        ok: false as const,
+        code: "FORBIDDEN" as const,
+        error: "Forbidden",
+        status: 403 as const,
+      };
+    }
+
+    // Global administrators intentionally bypass membership authorization,
+    // but they must not revive an organization whose lifecycle explicitly
+    // blocks writes. The organization row is part of the locked snapshot.
+    if (
+      !current.organization ||
+      !ORG_STATUSES_ALLOWING_ACCESS.includes(
+        current.organization.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+      )
+    ) {
+      return {
+        ok: false as const,
+        code: "ORGANIZATION_NOT_SUBMITTABLE" as const,
+        error: "ORGANIZATION_NOT_SUBMITTABLE",
+        status: 409 as const,
+      };
+    }
+
+    const transitioningHallIds = current.halls
+      .filter((hall) => hall.status === "draft" || hall.status === "rejected")
+      .map((hall) => hall.id);
+    const completionUserIds = [
+      actorUserId,
+      ...(current.venue.userId && current.venue.userId !== actorUserId
+        ? [current.venue.userId]
+        : []),
+    ];
+    const missing = await collectSubmitMissing(venueId, executor);
+    if (missing.length) {
+      return {
+        ok: false as const,
+        code: "ONBOARDING_INCOMPLETE" as const,
+        error: "ONBOARDING_INCOMPLETE",
+        missing,
+        status: 400 as const,
+      };
+    }
+    if (transitioningHallIds.length === 0) {
+      const alreadySubmitted = current.halls.some((hall) => hall.status === "pending") ||
+        (current.venue.isActive && current.halls.some((hall) => hall.status === "active"));
+      if (!alreadySubmitted) {
+        return {
+          ok: false as const,
+          code: "ONBOARDING_INCOMPLETE" as const,
+          error: "ONBOARDING_INCOMPLETE",
+          missing: [{
+            step: "hall",
+            field: "halls",
+            message: "at_least_one_submittable_hall",
+            path: "halls",
+          }],
+          status: 400 as const,
+        };
+      }
+      await executor
+        .update(users)
+        .set({ onboardingComplete: true, updatedAt: new Date() })
+        .where(inArray(users.id, completionUserIds));
+      return {
+        ok: true as const,
+        venueId,
+        organizationId: current.venue.organizationId,
+        submitted: false as const,
+        submissionKey,
+      };
+    }
+    await executor
+      .update(partnerOrganizations)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(and(
+        eq(partnerOrganizations.id, current.venue.organizationId),
+        inArray(partnerOrganizations.status, ["draft", "rejected"]),
+      ));
+    await executor
+      .update(venueHalls)
+      // Preserve the edit revision used by registrationSubmissionKey. Only a
+      // content edit or rejection starts a new submission generation.
+      .set({ status: "pending" })
+      .where(and(
+        eq(venueHalls.venueId, venueId),
+        inArray(venueHalls.id, transitioningHallIds),
+        inArray(venueHalls.status, ["draft", "rejected"]),
+      ));
+    await executor
+      .update(users)
+      .set({ onboardingComplete: true, updatedAt: new Date() })
+      .where(inArray(users.id, completionUserIds));
+
+    const [venue] = await executor
+      .select({ nameRo: venues.nameRo })
+      .from(venues)
+      .where(eq(venues.id, venueId))
+      .limit(1);
+    const admins = await executor
+      .select({ id: users.id })
+      .from(users)
+      .where(inArray(users.role, ["admin", "super_admin"]));
+    if (admins.length > 0) {
+      await executor
+        .insert(notifications)
+        .values(admins.map((admin) => ({
+          userId: admin.id,
+          type: "venue_registered",
+          title: "Local trimis la aprobare",
+          message: `${venue?.nameRo ?? "Local"} (#${venueId}) a fost trimis spre aprobare.`,
+          actionUrl: "/admin",
+          dedupeKey: `venue_registered:${venueId}:${submissionKey}:${admin.id}`,
+        })))
+        .onConflictDoNothing();
+    }
+    // External email delivery intentionally remains Phase 6 outbox work. It
+    // must not be dispatched directly from this transaction or route.
+    return {
+      ok: true as const,
+      venueId,
+      organizationId: current.venue.organizationId,
+      submitted: true as const,
+      submissionKey,
+    };
+  });
+}
+
+export async function archiveHall(actorUserId: string, hallId: number) {
   const [hall] = await db.select().from(venueHalls).where(eq(venueHalls.id, hallId)).limit(1);
   if (!hall) {
     return { ok: false as const, status: 404 as const, error: "Not found", code: "NOT_FOUND" as const };
   }
-  if (hall.status === "archived") return { ok: true as const, hallId };
+  const expected = await captureVenueRegistrationSnapshot(hall.venueId);
+  if (!expected) {
+    return { ok: false as const, status: 404 as const, error: "Not found", code: "NOT_FOUND" as const };
+  }
 
   try {
-    await db.transaction(async (tx) => {
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" });
+    const result = await db.transaction(async (tx) => {
+      const executor = tx as unknown as typeof db;
+      await acquireLegalScopeLocks(tx, {
+        userIds: [actorUserId],
+        organizationIds: expected.venue.organizationId == null
+          ? []
+          : [expected.venue.organizationId],
+      });
+
+      // The timezone is part of the registration CAS token. If it changes
+      // while we wait, the snapshot comparison below aborts this transition.
+      const today = localDateInZone(new Date(), expected.venue.timezone);
       await acquireAvailabilityLocks(tx, {
         venueId: hall.venueId,
         hallIds: [hallId],
         localDates: [today],
         conflictGroupIds: [],
       });
-      const [locked] = await tx
+
+      const actor = await getLockedAppUserById(actorUserId, executor);
+      if (!actor) {
+        return { ok: false as const, status: 403 as const, error: "Forbidden", code: "FORBIDDEN" as const };
+      }
+      const current = await loadLockedVenueRegistrationSnapshot(hall.venueId, executor);
+      if (
+        !current ||
+        !venueRegistrationSnapshotMatches(expected, current)
+      ) {
+        return { ok: false as const, status: 409 as const, error: "HALL_CHANGED", code: "HALL_CHANGED" as const };
+      }
+      if (current.venue.organizationId != null) {
+        const access = await authorizeOrganizationCapabilityLocked(
+          actor,
+          current.venue.organizationId,
+          "manage_venues",
+          executor,
+        );
+        if (!access.ok) {
+          return { ok: false as const, status: 403 as const, error: "Forbidden", code: "FORBIDDEN" as const };
+        }
+      } else if (!actor.isGlobalAdmin && current.venue.userId !== actor.id) {
+        return { ok: false as const, status: 403 as const, error: "Forbidden", code: "FORBIDDEN" as const };
+      }
+
+      const [locked] = await executor
         .select()
         .from(venueHalls)
-        .where(eq(venueHalls.id, hallId))
+        .where(and(eq(venueHalls.id, hallId), eq(venueHalls.venueId, hall.venueId)))
         .for("update")
         .limit(1);
-      if (!locked || locked.status === "archived") return;
-      const siblings = await tx
+      if (!locked) {
+        return { ok: false as const, status: 409 as const, error: "HALL_CHANGED", code: "HALL_CHANGED" as const };
+      }
+      if (locked.status === "archived") {
+        return { ok: true as const, hallId };
+      }
+      const siblings = await executor
         .select({ id: venueHalls.id, status: venueHalls.status })
         .from(venueHalls)
         .where(eq(venueHalls.venueId, locked.venueId));
-      if (isUsableHallStatus(locked.status)) {
+      if (current.venue.isActive) {
+        const active = siblings.filter((row) => row.status === "active");
+        if (active.length === 0 || (locked.status === "active" && active.length <= 1)) {
+          throw Object.assign(new Error("LAST_USABLE_HALL"), { code: "LAST_USABLE_HALL" });
+        }
+      } else if (isUsableHallStatus(locked.status)) {
         const usable = siblings.filter((row) => isUsableHallStatus(row.status));
         if (usable.length <= 1) {
           throw Object.assign(new Error("LAST_USABLE_HALL"), { code: "LAST_USABLE_HALL" });
         }
       }
-      const [future] = await tx
+      const [future] = await executor
         .select({ id: bookingRequests.id })
         .from(bookingRequests)
         .where(
@@ -723,7 +1499,7 @@ export async function archiveHall(hallId: number) {
       if (future) {
         throw Object.assign(new Error("HALL_HAS_FUTURE_BOOKINGS"), { code: "HALL_HAS_FUTURE_BOOKINGS" });
       }
-      const [updated] = await tx
+      const [updated] = await executor
         .update(venueHalls)
         .set({ status: "archived", updatedAt: new Date() })
         .where(and(eq(venueHalls.id, hallId), eq(venueHalls.status, locked.status)))
@@ -731,7 +1507,9 @@ export async function archiveHall(hallId: number) {
       if (!updated) {
         throw Object.assign(new Error("HALL_CHANGED"), { code: "HALL_CHANGED" });
       }
+      return { ok: true as const, hallId };
     });
+    return result;
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (code === "LAST_USABLE_HALL" || code === "HALL_HAS_FUTURE_BOOKINGS" || code === "HALL_CHANGED") {
@@ -744,7 +1522,6 @@ export async function archiveHall(hallId: number) {
     }
     throw error;
   }
-  return { ok: true as const, hallId };
 }
 
 export function multiHallWritesEnabled(): boolean {

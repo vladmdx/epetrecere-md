@@ -35,11 +35,11 @@ import {
 import {
   archiveHall,
   ensureDraftOrganization,
-  saveHallDraft,
   saveOrganizationProfile,
   saveVenueDraft,
   submitVenueForApproval,
 } from "../src/lib/partner/onboarding";
+import { createHallDraft } from "../src/lib/partner/hall-writes";
 import { adminContractsForVenue, organizationHasAnyAcceptance } from "../src/lib/partner/legal";
 import { redactOrganizationForRole } from "../src/lib/partner/organization-dto";
 import { organizationPatchSchema } from "../src/lib/partner/validation";
@@ -84,6 +84,7 @@ const PHONE = "+37369123456";
 const ids = {
   owner: "",
   owner2: "",
+  reviewer: "",
   staff: "",
   outsider: "",
   client: "",
@@ -150,6 +151,13 @@ before(async () => {
     clerkId: MARK + "owner2", email: `${MARK}owner2@example.com`, name: "Owner2",
   }).returning({ id: users.id });
   ids.owner2 = owner2.id;
+  const [reviewer] = await db.insert(users).values({
+    clerkId: MARK + "reviewer",
+    email: `${MARK}reviewer@example.com`,
+    name: "Reviewer",
+    role: "admin",
+  }).returning({ id: users.id });
+  ids.reviewer = reviewer.id;
   const [staff] = await db.insert(users).values({
     clerkId: MARK + "staff", email: `${MARK}staff@example.com`, name: "Staff",
   }).returning({ id: users.id });
@@ -204,19 +212,19 @@ before(async () => {
   assert.equal(v1.ok, true, JSON.stringify(v1));
   if (!v1.ok) throw new Error("v1");
   ids.venue = v1.venue.id;
-  const h1 = await saveHallDraft({
-    venueId: ids.venue, nameRo: "Grand", capacityMin: 20, capacityMax: 80, imageUrls: [],
+  const h1 = await createHallDraft(ids.owner, {
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Grand", capacityMin: 20, capacityMax: 80, imageUrls: [],
   });
   assert.equal(h1.ok, true);
   if (h1.ok) ids.hallA = h1.hall.id;
-  const h2 = await saveHallDraft({
-    venueId: ids.venue, nameRo: "Garden", capacityMin: 10, capacityMax: 40, imageUrls: [],
+  const h2 = await createHallDraft(ids.owner, {
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Garden", capacityMin: 10, capacityMax: 40, imageUrls: [],
   });
   assert.equal(h2.ok, true);
   if (h2.ok) ids.hallB = h2.hall.id;
-  const submitted = await submitVenueForApproval(ids.venue);
+  const submitted = await submitVenueForApproval(ids.owner, ids.venue);
   assert.equal(submitted.ok, true);
-  const approved = await approvePartnerVenue(ids.venue);
+  const approved = await approvePartnerVenue(ids.reviewer, ids.venue);
   assert.equal(approved.ok, true, JSON.stringify(approved));
 
   const [artist] = await db.insert(artists).values({
@@ -229,7 +237,7 @@ before(async () => {
 
 after(async () => {
   await db.delete(notifications).where(inArray(notifications.userId, [
-    ids.owner, ids.staff, ids.outsider, ids.client, ids.artistUser, ids.owner2,
+    ids.owner, ids.staff, ids.outsider, ids.client, ids.artistUser, ids.owner2, ids.reviewer,
   ].filter(Boolean)));
   await db.delete(conversations).where(inArray(conversations.clientUserId, [ids.client, ids.outsider].filter(Boolean)));
   // Disposable snapshot may lag schema.ts (0031 deliveries table). Skip only
@@ -282,6 +290,7 @@ test("fresh POST legal fields persist; add venue does not mutate the first local
   const created = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
     createIntent: true,
+    createRequestId: randomUUID(),
     name: MARK + "Local 2",
     phone: PHONE,
     city: "Chișinău",
@@ -299,8 +308,8 @@ test("fresh POST legal fields persist; add venue does not mutate the first local
 });
 
 test("approval: extra hall pending keeps venue searchable; reject extra hall keeps venue active", async () => {
-  const extra = await saveHallDraft({
-    venueId: ids.venue, nameRo: "VIP pending", capacityMin: 8, capacityMax: 16, imageUrls: [],
+  const extra = await createHallDraft(ids.owner, {
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "VIP pending", capacityMin: 8, capacityMax: 16, imageUrls: [],
   });
   assert.equal(extra.ok, true);
   if (!extra.ok) throw new Error("extra hall");
@@ -310,14 +319,14 @@ test("approval: extra hall pending keeps venue searchable; reject extra hall kee
   const pending = await listPendingPartnerVenues();
   assert.ok(pending.some((row) => row.id === ids.venue));
 
-  const rejected = await rejectPartnerVenue(ids.venue);
+  const rejected = await rejectPartnerVenue(ids.reviewer, ids.venue);
   assert.equal(rejected.ok, true, JSON.stringify(rejected));
   const [still] = await db.select({ isActive: venues.isActive }).from(venues).where(eq(venues.id, ids.venue));
   assert.equal(still.isActive, true);
   const [hall] = await db.select({ status: venueHalls.status }).from(venueHalls).where(eq(venueHalls.id, extra.hall.id));
   assert.equal(hall.status, "rejected");
 
-  const direct = await approvePartnerVenue(ids.venue);
+  const direct = await approvePartnerVenue(ids.reviewer, ids.venue);
   assert.equal(direct.ok, false);
   if (!direct.ok) assert.equal(direct.code, "NOT_PENDING");
 });
@@ -330,6 +339,7 @@ test("phone: same number on two venues; owner users.phone unchanged when flag ON
   const otherAccount = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
     createIntent: true,
+    createRequestId: randomUUID(),
     name: MARK + "Phone Twin",
     phone: "+37369111111",
     city: "Chișinău",
@@ -366,7 +376,7 @@ test("PATCH is partial: billing-only does not default type to company; legal fre
   if (parsed.success) assert.equal(parsed.data.type, undefined);
 
   await db.update(partnerOrganizations).set({ type: "sole_trader" }).where(eq(partnerOrganizations.id, ids.org));
-  const billed = await saveOrganizationProfile(ids.org, { billingEmail: "ops@example.com" });
+  const billed = await saveOrganizationProfile(appUser(ids.owner), ids.org, { billingEmail: "ops@example.com" });
   assert.equal(billed.ok, true);
   const [row] = await db.select().from(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   assert.equal(row.type, "sole_trader");
@@ -374,9 +384,9 @@ test("PATCH is partial: billing-only does not default type to company; legal fre
   await db.update(partnerOrganizations).set({ type: "company" }).where(eq(partnerOrganizations.id, ids.org));
 
   assert.equal(await organizationHasAnyAcceptance(ids.org), true);
-  const address = await saveOrganizationProfile(ids.org, { legalAddress: "Chișinău, str. Alternate 99" });
+  const address = await saveOrganizationProfile(appUser(ids.owner), ids.org, { legalAddress: "Chișinău, str. Alternate 99" });
   assert.equal(address.ok, false);
-  const again = await saveOrganizationProfile(ids.org, { legalName: "Other SRL" });
+  const again = await saveOrganizationProfile(appUser(ids.owner), ids.org, { legalName: "Other SRL" });
   assert.equal(again.ok, false);
 });
 
@@ -635,13 +645,18 @@ test("archiveHall concurrent last two halls: one LAST_USABLE_HALL", async () => 
   const usable = halls.filter((hall) => hall.status === "active" || hall.status === "pending");
   while (usable.length > 2) {
     const extra = usable.pop()!;
-    const archived = await archiveHall(extra.id);
+    const archived = await archiveHall(ids.owner, extra.id);
     assert.equal(archived.ok, true, JSON.stringify(archived));
   }
   assert.equal(usable.length, 2);
-  const race = await Promise.all([archiveHall(usable[0]!.id), archiveHall(usable[1]!.id)]);
+  const race = await Promise.all([
+    archiveHall(ids.owner, usable[0]!.id),
+    archiveHall(ids.owner, usable[1]!.id),
+  ]);
   const ok = race.filter((item) => item.ok);
-  const last = race.filter((item) => !item.ok && "code" in item && item.code === "LAST_USABLE_HALL");
+  const last = race.filter((item) =>
+    !item.ok && "code" in item &&
+    (item.code === "LAST_USABLE_HALL" || item.code === "HALL_CHANGED"));
   assert.equal(ok.length, 1);
   assert.equal(last.length, 1);
 });

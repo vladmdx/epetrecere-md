@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { venues, venueImages, reviews, calendarEvents } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, gte, lte, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, ilike, isNull, or } from "drizzle-orm";
 
 export interface VenueFilters {
   capacityMin?: number;
@@ -95,7 +95,10 @@ export async function getVenues(filters: VenueFilters = {}) {
           sortOrder: venueImages.sortOrder,
         })
         .from(venueImages)
-        .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+        .where(and(
+          sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
+          isNull(venueImages.hallId),
+        ))
         .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
     : [];
   const coverMap = new Map<number, string>();
@@ -128,7 +131,7 @@ export async function getVenueBySlug(slug: string) {
     db
       .select()
       .from(venueImages)
-      .where(eq(venueImages.venueId, venue.id))
+      .where(and(eq(venueImages.venueId, venue.id), isNull(venueImages.hallId)))
       .orderBy(asc(venueImages.sortOrder)),
     db
       .select()
@@ -159,7 +162,10 @@ export async function getFeaturedVenues(limit = 6) {
       sortOrder: venueImages.sortOrder,
     })
     .from(venueImages)
-    .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+    .where(and(
+      sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
+      isNull(venueImages.hallId),
+    ))
     .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder));
 
   const coverMap = new Map<number, string>();

@@ -5,10 +5,11 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
-import { and, eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { validatePhone } from "@/lib/phone/validate";
+import { writeUserPhoneInDatabase } from "@/lib/auth/user-phone";
 
 const schema = z.object({
   phone: z.string().min(6).max(32),
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
           name:
             [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
             null,
-          phone: normalized,
+          phone: null,
           avatarUrl: clerkUser.imageUrl || null,
           role: "user",
         })
@@ -82,28 +83,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 500 });
     }
 
-    // Uniqueness — every account must have a distinct phone so partner
-    // contact links and SMS deduplication work. Self-edits keep the same
-    // number, so we exclude the current user from the lookup.
-    const [collision] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.phone, normalized), ne(users.id, appUser.id)))
-      .limit(1);
-    if (collision) {
+    const phoneWrite = await writeUserPhoneInDatabase(appUser.id, normalized);
+    if (!phoneWrite.ok && phoneWrite.code === "PHONE_IN_USE") {
       return NextResponse.json(
         {
+          code: "phone_in_use",
           error:
             "Acest număr de telefon este deja folosit de un alt cont.",
         },
         { status: 409 },
       );
     }
-
-    await db
-      .update(users)
-      .set({ phone: normalized, updatedAt: new Date() })
-      .where(eq(users.id, appUser.id));
+    if (!phoneWrite.ok) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true, phone: normalized });
   } catch (err) {

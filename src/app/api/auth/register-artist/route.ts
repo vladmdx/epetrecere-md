@@ -7,15 +7,17 @@ import {
   artists,
   categories,
   artistPackages,
+  legalAcceptances,
   users,
   notifications,
-  venues,
 } from "@/lib/db/schema";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { claimArtistRegistrationInDatabase } from "@/lib/auth/select-role";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
@@ -90,8 +92,8 @@ const registerSchema = z.object({
   name: z.string().refine((v) => checkName(v).ok, {
     message: "name_not_substantive",
   }),
-  // Phone is now collected at registration and stored on the user; the
-  // onboarding form may send an empty string. We fall back to users.phone.
+  // Legacy/mobile clients may omit this field, but the locked account must
+  // then already carry a valid phone. Registration never completes without it.
   phone: z.string().optional().default(""),
   categoryId: z.number().int().positive(),
   eventTypes: z
@@ -172,7 +174,9 @@ export async function POST(req: Request) {
           name: [clerkUser.firstName, clerkUser.lastName]
             .filter(Boolean)
             .join(" ") || null,
-          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
+          // Registration claims the canonical phone under a dedicated lock;
+          // never pre-populate an unverified duplicate during fallback sync.
+          phone: null,
           avatarUrl: clerkUser.imageUrl || null,
           role: "user",
         })
@@ -201,31 +205,6 @@ export async function POST(req: Request) {
     const missing = await missingRegistrationDocuments(appUser.id, "artist");
     if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
 
-    // Check if already registered as artist
-    const [existingArtist] = await db
-      .select({ id: artists.id })
-      .from(artists)
-      .where(eq(artists.userId, appUser.id))
-      .limit(1);
-
-    if (existingArtist) {
-      return NextResponse.json(
-        { error: "Already registered as artist", artistId: existingArtist.id },
-        { status: 409 },
-      );
-    }
-    const [existingVenue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(eq(venues.userId, appUser.id))
-      .limit(1);
-    if (existingVenue) {
-      return NextResponse.json(
-        { error: "Un cont de sală nu poate fi înregistrat și ca artist." },
-        { status: 409 },
-      );
-    }
-
     const data = parsed.data;
     const [category] = await db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, data.categoryId), eq(categories.isActive, true))).limit(1);
     if (!category) return NextResponse.json({ error: "invalid_category" }, { status: 400 });
@@ -240,43 +219,17 @@ export async function POST(req: Request) {
       return !!hit;
     });
 
-    // Phone falls back to the user's phone (collected at registration).
-    // Validate against the country-specific format and de-dupe across
-    // accounts so each artist contact is unique.
-    const candidatePhone =
-      data.phone && data.phone.trim().length >= 6
-        ? data.phone
-        : appUser.phone || "";
-    let finalPhone = candidatePhone;
-    if (candidatePhone) {
-      const phoneCheck = validatePhone(candidatePhone);
+    // An omitted legacy/mobile field means "preserve the account phone", not
+    // "write the pre-transaction snapshot back". Only an explicit value is
+    // normalized here; the callback reads the locked account value below.
+    const suppliedPhone = data.phone.trim();
+    let requestedPhone: string | undefined;
+    if (suppliedPhone) {
+      const phoneCheck = validatePhone(suppliedPhone);
       if (!phoneCheck.ok) {
         return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
       }
-      finalPhone = phoneCheck.e164;
-      const [phoneCollision] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.phone, finalPhone), ne(users.id, appUser.id)))
-        .limit(1);
-      if (phoneCollision) {
-        return NextResponse.json(
-          {
-            code: "phone_in_use",
-            error:
-              "Acest număr de telefon este deja folosit de un alt cont.",
-          },
-          { status: 409 },
-        );
-      }
-      // Keep the user row in sync — partners often edit their phone in
-      // onboarding even if they entered a different one earlier.
-      if (appUser.phone !== finalPhone) {
-        await db
-          .update(users)
-          .set({ phone: finalPhone, updatedAt: new Date() })
-          .where(eq(users.id, appUser.id));
-      }
+      requestedPhone = phoneCheck.e164;
     }
 
     // priceFrom precedence: minimum across the packages array, falling
@@ -317,39 +270,105 @@ export async function POST(req: Request) {
         (data.descriptionLanguage === "en" ? sourceDescription : null),
     };
 
-    // Create artist (inactive — needs admin approval)
-    const [artist] = await db
-      .insert(artists)
-      .values({
-        userId: appUser.id,
-        nameRo: data.name,
-        nameRu: data.name,
-        nameEn: data.name,
-        slug,
-        phone: finalPhone,
-        email: appUser.email,
-        photoUrl: data.imageUrl || null,
-        descriptionRo: descriptions.ro,
-        descriptionRu: descriptions.ru,
-        descriptionEn: descriptions.en,
-        ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
-        travelDistanceKm: data.travelDistanceKm ?? 30,
-        travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
-        travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount ?? null : null,
-        priceHidden: data.priceHidden ?? false,
-        priceFrom: resolvedPriceFrom,
-        categoryIds: [data.categoryId],
-        // Older mobile builds do not send this field yet. They retain the
-        // all-events behaviour while the current onboarding requires a choice.
-        eventTypes: data.eventTypes ?? [...EVENT_TYPE_KEYS],
-        isActive: false,
-        isVerified: false,
-        isFeatured: false,
-        isPremium: false,
-        calendarEnabled: false,
-        seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
-      })
-      .returning();
+    const claimed = await claimArtistRegistrationInDatabase({
+      userId: appUser.id,
+      multiHallEnabled: isMultiHallEnabled(),
+      normalizedPhone: requestedPhone,
+      write: async (executor, lockedUser) => {
+        const finalPhone = requestedPhone ?? lockedUser.phone;
+        if (!finalPhone) throw new Error("artist_registration_phone_invariant_failed");
+        const [artist] = await executor
+          .insert(artists)
+          .values({
+            userId: lockedUser.id,
+            nameRo: data.name,
+            nameRu: data.name,
+            nameEn: data.name,
+            slug,
+            phone: finalPhone,
+            email: lockedUser.email,
+            photoUrl: data.imageUrl || null,
+            descriptionRo: descriptions.ro,
+            descriptionRu: descriptions.ru,
+            descriptionEn: descriptions.en,
+            ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
+            travelDistanceKm: data.travelDistanceKm ?? 30,
+            travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
+            travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount ?? null : null,
+            priceHidden: data.priceHidden ?? false,
+            priceFrom: resolvedPriceFrom,
+            categoryIds: [data.categoryId],
+            // Older mobile builds do not send this field yet. They retain the
+            // all-events behaviour while the current onboarding requires a choice.
+            eventTypes: data.eventTypes ?? [...EVENT_TYPE_KEYS],
+            isActive: false,
+            isVerified: false,
+            isFeatured: false,
+            isPremium: false,
+            calendarEnabled: false,
+            seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
+          })
+          .returning();
+
+        if (validTiers.length > 0) {
+          await executor.insert(artistPackages).values(
+            validTiers.map((p) => ({
+              artistId: artist.id,
+              nameRo:
+                p.nameRo?.trim() ||
+                (p.pricingMode === "per_event"
+                  ? EVENT_TYPE_NAME_RO[p.eventType ?? "other"]
+                  : p.hours > 0
+                    ? `${p.hours}h${p.minutes ? ` ${p.minutes}min` : ""}`
+                    : `${p.minutes} min`),
+              price: p.price,
+              durationHours:
+                p.pricingMode === "per_event" ? null : p.hours > 0 ? p.hours : null,
+              durationMinutes: p.pricingMode === "per_event" ? 0 : p.minutes,
+              pricingMode: p.pricingMode,
+              eventType: p.pricingMode === "per_event" ? (p.eventType ?? null) : null,
+              scope: "base" as const,
+              isVisible: true,
+            })),
+          );
+        }
+        // The acceptance predates the profile by design. Link it in the same
+        // transaction as profile creation so a lost HTTP response cannot
+        // leave a permanently unlinked contract on the retry path.
+        await executor
+          .update(legalAcceptances)
+          .set({ artistId: artist.id })
+          .where(and(
+            eq(legalAcceptances.userId, lockedUser.id),
+            eq(legalAcceptances.subjectType, "artist"),
+            isNull(legalAcceptances.organizationId),
+            isNull(legalAcceptances.artistId),
+          ));
+        return { artist, userEmail: lockedUser.email, finalPhone };
+      },
+    });
+    if (!claimed.ok) {
+      if (
+        claimed.code === "ARTIST_ALREADY_REGISTERED"
+        && claimed.replayable
+        && claimed.profileId
+      ) {
+        return NextResponse.json({
+          success: true,
+          artistId: claimed.profileId,
+          replayed: true,
+        });
+      }
+      return NextResponse.json(
+        {
+          error: claimed.error,
+          code: claimed.code === "PHONE_IN_USE" ? "phone_in_use" : claimed.code,
+          ...(claimed.profileId ? { artistId: claimed.profileId } : {}),
+        },
+        { status: claimed.status },
+      );
+    }
+    const { artist, userEmail, finalPhone } = claimed.value;
 
     // Legacy/mobile clients may still send one description only. Fill just
     // the missing languages in the background; never rewrite the partner's
@@ -405,40 +424,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Persist each duration tier as an artist_packages row. Skipped
-    // when the array is empty so legacy onboarding submissions stay
-    // exactly the same shape.
-    if (validTiers.length > 0) {
-      await db.insert(artistPackages).values(
-        validTiers.map((p) => ({
-          artistId: artist.id,
-          nameRo:
-            p.nameRo?.trim() ||
-            (p.pricingMode === "per_event"
-              ? EVENT_TYPE_NAME_RO[p.eventType ?? "other"]
-              : p.hours > 0
-                ? `${p.hours}h${p.minutes ? ` ${p.minutes}min` : ""}`
-                : `${p.minutes} min`),
-          price: p.price,
-          // For a per-event tier the duration is not a billable unit; leave it
-          // empty rather than writing a zero that reads as "0 hours".
-          durationHours:
-            p.pricingMode === "per_event" ? null : p.hours > 0 ? p.hours : null,
-          durationMinutes: p.pricingMode === "per_event" ? 0 : p.minutes,
-          pricingMode: p.pricingMode,
-          eventType: p.pricingMode === "per_event" ? (p.eventType ?? null) : null,
-          scope: "base" as const,
-          isVisible: true,
-        })),
-      );
-    }
-
-    // Update user role to artist and mark onboarding complete
-    await db
-      .update(users)
-      .set({ role: "artist", onboardingComplete: true })
-      .where(eq(users.id, appUser.id));
-
     // Referral milestone — non-blocking, dedupes server-side.
     after(async () => {
       try {
@@ -452,30 +437,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Link the Legal Pack signature to the profile that has just been
-    // created. Onboarding records the acceptance BEFORE the artist row
-    // exists — deliberately, so nobody goes live without a contract — which
-    // left artist_id NULL on every signature and made the admin contracts
-    // page fall back to a bare e-mail instead of the partner's name.
-    // Backfilling here is the fix: the id is written once, at the first
-    // moment it exists, and the append-only trigger allows exactly this
-    // NULL → id transition and nothing else.
-    const { legalAcceptances } = await import("@/lib/db/schema");
-    const { desc: descOrder, isNull } = await import("drizzle-orm");
-    try {
-      await db
-        .update(legalAcceptances)
-        .set({ artistId: artist.id })
-        .where(
-          and(
-            eq(legalAcceptances.userId, appUser.id),
-            eq(legalAcceptances.subjectType, "artist"),
-            isNull(legalAcceptances.artistId),
-          ),
-        );
-    } catch (err) {
-      console.error("[register-artist] linking signature to artist failed", err);
-    }
+    const { desc: descOrder } = await import("drizzle-orm");
 
     // Keep serverless notification work alive without delaying a successful
     // registration or returning an error after the profile already exists.
@@ -514,7 +476,7 @@ export async function POST(req: Request) {
         userId: admin.id,
         type: "artist_registered",
         title: "Artist nou înregistrat!",
-        message: `${data.name} (${appUser.email}) s-a înregistrat ca artist și așteaptă aprobare.`,
+        message: `${data.name} (${userEmail}) s-a înregistrat ca artist și așteaptă aprobare.`,
         actionUrl: `/admin/cereri-inregistrare`,
       });
 
@@ -532,7 +494,7 @@ export async function POST(req: Request) {
           html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
             <h2 style="color:#C9A84C;margin:0 0 16px;">Artist Nou Înregistrat</h2>
             ${photoBlock}
-            <p><strong>${data.name}</strong> (${appUser.email}) s-a înregistrat ca artist.</p>
+            <p><strong>${data.name}</strong> (${userEmail}) s-a înregistrat ca artist.</p>
             <p>Telefon: ${finalPhone || "—"}</p>
             <p>Oraș: ${data.location || "Nespecificat"}</p>
             <div style="margin-top:20px;text-align:center;">

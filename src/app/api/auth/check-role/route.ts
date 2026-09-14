@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 // This endpoint drives the post-signup role picker. The response MUST
 // reflect the latest DB state — a stale cached "you're already onboarded"
@@ -19,50 +20,38 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
-  // Rate limit to prevent abuse
+  // This response contains role, onboarding and profile identifiers. It is
+  // strictly self-scoped; an e-mail query parameter is never authorization.
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit to prevent abuse.
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = await rateLimit(`check-role:${ip}`, 15, 60_000);
+  const { success } = await rateLimit(`check-role:${clerkId}:${ip}`, 15, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  // Prefer Clerk session auth over email param to avoid enumeration
-  const { userId: clerkId } = await auth();
-
-  const email = req.nextUrl.searchParams.get("email");
-  if (!clerkId && !email) {
-    return NextResponse.json({ role: "user", isNewUser: true });
-  }
-
-  // Try to find the user by clerkId first, then by email
+  // Resolve exclusively from the authenticated Clerk subject. Looking up an
+  // arbitrary `?email=` previously allowed account enumeration and PII leaks.
   let dbUser: typeof users.$inferSelect | null = null;
-
-  if (clerkId) {
-    const [found] = await db
-      .select()
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    dbUser = found ?? null;
-  }
-
-  if (!dbUser && email) {
-    const [found] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    dbUser = found ?? null;
-  }
+  const [found] = await db
+    .select()
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  dbUser = found ?? null;
 
   // User not in DB yet (webhook hasn't fired or CLERK_WEBHOOK_SECRET missing).
   // Create the user record as a fallback so the flow isn't broken.
-  if (!dbUser && clerkId) {
+  if (!dbUser) {
     try {
       const client = await clerkClient();
       const clerkUser = await client.users.getUser(clerkId);
       const fallbackEmail =
-        clerkUser.emailAddresses[0]?.emailAddress || email || "";
+        clerkUser.emailAddresses[0]?.emailAddress || "";
       const fallbackName = [clerkUser.firstName, clerkUser.lastName]
         .filter(Boolean)
         .join(" ") || null;
@@ -106,11 +95,21 @@ export async function GET(req: NextRequest) {
   }
 
   // Check venue ownership (separate from role). ADR 0028 — membership chain.
-  const [venue] = await db
-    .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
+  const venueRows = await db
+    .select({
+      id: venues.id,
+      slug: venues.slug,
+      isActive: venues.isActive,
+      organizationId: venues.organizationId,
+    })
     .from(venues)
-    .where(inArray(venues.id, await listAccessibleVenueIds(dbUser.id)))
-    .limit(1);
+    .where(inArray(venues.id, await listAccessibleVenueIds(dbUser.id)));
+  // During an OFF→ON rollout, prioritize the organization-null venue which
+  // must be recovered in onboarding. Picking an arbitrary attached venue can
+  // otherwise hide the incomplete legacy row forever.
+  const venue = isMultiHallEnabled()
+    ? venueRows.find((row) => row.organizationId == null) ?? venueRows[0]
+    : venueRows[0];
 
   // If user is an artist, check onboarding status
   if (dbUser.role === "artist") {
@@ -152,6 +151,9 @@ export async function GET(req: NextRequest) {
   //      negligible UX cost vs. silently locking a partner/venue
   //      candidate into a client experience.
   const hasVenue = !!venue;
+  const venueNeedsOrganization = Boolean(
+    venue && isMultiHallEnabled() && venue.organizationId == null,
+  );
   let isNewUser = false;
 
   if (dbUser.role === "user" && !hasVenue) {
@@ -188,8 +190,9 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     role: hasVenue ? "venue" : dbUser.role,
-    onboardingComplete: true,
+    onboardingComplete: dbUser.onboardingComplete && !venueNeedsOrganization,
     hasVenue,
+    venueNeedsOrganization,
     isNewUser,
     phone: dbUser.phone ?? null,
     venueId: venue?.id ?? null,

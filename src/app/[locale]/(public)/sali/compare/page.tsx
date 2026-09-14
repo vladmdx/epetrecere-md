@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import Link from "@/components/shared/locale-link";
-import { asc, desc, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, venueImages } from "@/lib/db/schema";
 import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
@@ -113,15 +113,24 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
         menuPdfUrl: venues.menuPdfUrl,
       })
       .from(venues)
-      .where(inArray(venues.id, ids)),
+      .where(and(inArray(venues.id, ids), eq(venues.isActive, true))),
     // Photos are the fastest way to tell three halls apart, and this page used
     // to draw the same grey pin for all of them. Same ordering as the listing
     // query, so a venue shows the same cover here as on its card.
     db
       .select({ venueId: venueImages.venueId, url: venueImages.url })
       .from(venueImages)
-      .where(inArray(venueImages.venueId, ids))
-      .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder)),
+      .innerJoin(venues, eq(venues.id, venueImages.venueId))
+      .where(and(
+        inArray(venueImages.venueId, ids),
+        isNull(venueImages.hallId),
+        eq(venues.isActive, true),
+      ))
+      .orderBy(
+        desc(venueImages.isCover),
+        asc(venueImages.sortOrder),
+        asc(venueImages.id),
+      ),
   ]);
 
   if (rows.length === 0) notFound();

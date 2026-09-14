@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, venues, users, categories, notifications, venueImages, artistPackages, legalAcceptances } from "@/lib/db/schema";
+import { artists, venues, users, categories, venueImages, artistPackages, legalAcceptances } from "@/lib/db/schema";
 import { eq, and, sql, inArray, asc, desc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { registrationStatusEmail } from "@/lib/email/templates/registration-status";
 import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
-import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
-import { approvePartnerVenue, listPendingPartnerVenues, rejectPartnerVenue } from "@/lib/partner/registration-decision";
+import {
+  approvePartnerArtist,
+  approvePartnerVenue,
+  listPendingPartnerVenues,
+  rejectPartnerArtist,
+  rejectPartnerVenue,
+} from "@/lib/partner/registration-decision";
 import { jsonIfOrganizationBackedVenueDisabled } from "@/lib/partner/multi-hall-gate";
 import { adminContractsForVenue } from "@/lib/partner/legal";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
@@ -219,100 +225,50 @@ export async function POST(req: Request) {
 
   try {
     if (type === "artist") {
-      const [artist] = await db
-        .select({
-          id: artists.id,
-          nameRo: artists.nameRo,
-          slug: artists.slug,
-          email: artists.email,
-          userId: artists.userId,
-          isActive: artists.isActive,
-        })
-        .from(artists)
-        .where(eq(artists.id, id))
-        .limit(1);
-
-      if (!artist) {
-        return NextResponse.json({ error: "Artist not found" }, { status: 404 });
+      const decided = action === "approve"
+        ? await approvePartnerArtist(admin.id, id)
+        : await rejectPartnerArtist(admin.id, id);
+      if (!decided.ok) {
+        return NextResponse.json(
+          { error: decided.error, missing: decided.missing, code: decided.code },
+          { status: decided.status },
+        );
       }
-
+      const artist = decided.artist;
       if (action === "approve") {
-        if (artist.userId) {
-          const missing = await missingRegistrationDocuments(artist.userId, "artist");
-          if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
-        }
-        await db
-          .update(artists)
-          .set({ isActive: true, updatedAt: new Date() })
-          .where(eq(artists.id, id));
-
-        // Notify artist
-        if (artist.userId) {
-          await db.insert(notifications).values({
-            userId: artist.userId,
-            type: "registration_approved",
-            title: "Profilul tău a fost aprobat! 🎉",
-            message: "Profilul tău este acum vizibil pe ePetrecere.md. Bine ai venit!",
-            actionUrl: "/dashboard",
-          });
-        }
-
-        // Send email
-        const email = artist.email;
-        if (email) {
-          await sendEmail({
-            to: email,
-            subject: "Profilul tău pe ePetrecere.md a fost aprobat! 🎉",
-            html: registrationStatusEmail({
-              name: artist.nameRo,
-              type: "artist",
-              approved: true,
-            }),
-          }).catch((err) => console.error("[email] Failed to send approval email:", err));
-        }
-      } else {
-        // Reject — delete artist record and reset user role
-        if (artist.userId) {
-          await db
-            .update(users)
-            .set({ role: "user", onboardingComplete: false, updatedAt: new Date() })
-            .where(eq(users.id, artist.userId));
-
-          await db.insert(notifications).values({
-            userId: artist.userId,
-            type: "registration_rejected",
-            title: "Cererea ta a fost refuzată",
-            message:
-              "Profilul tău nu a fost aprobat. Contactează-ne dacă ai întrebări.",
-            actionUrl: "/contact",
-          });
-        }
-
-        const email = artist.email;
-        if (email) {
-          await sendEmail({
-            to: email,
-            subject: "Actualizare privind înregistrarea pe ePetrecere.md",
-            html: registrationStatusEmail({
-              name: artist.nameRo,
-              type: "artist",
-              approved: false,
-            }),
-          }).catch((err) => console.error("[email] Failed to send rejection email:", err));
-        }
-
-        await db.delete(artists).where(eq(artists.id, id));
-      }
-
-      // Approval publishes a new supplier; rejecting an unexpectedly active
-      // row withdraws one. Pending rejections never touched the public cache.
-      if (action === "approve" || artist.isActive) {
         revalidateVendorCatalog("artist", {
           profileSlugs: [artist.slug],
           directory: true,
           homepage: true,
           services: true,
         });
+      }
+      const emailTargets = [
+        ...new Set([
+          ...(artist.email ? [artist.email] : []),
+          ...decided.emails
+            .map((row) => row.email)
+            .filter((value): value is string => Boolean(value)),
+        ]),
+      ];
+      const approved = action === "approve";
+      for (const email of emailTargets) {
+        await sendEmail({
+          to: email,
+          subject: approved
+            ? "Profilul tău pe ePetrecere.md a fost aprobat! 🎉"
+            : "Actualizare privind înregistrarea pe ePetrecere.md",
+          html: registrationStatusEmail({
+            name: artist.nameRo,
+            type: "artist",
+            approved,
+          }),
+        }).catch((err) => console.error(
+          approved
+            ? "[email] Failed to send approval email:"
+            : "[email] Failed to send rejection email:",
+          err,
+        ));
       }
     } else if (type === "venue") {
       const [venue] = await db
@@ -336,65 +292,72 @@ export async function POST(req: Request) {
       const orgBlocked = jsonIfOrganizationBackedVenueDisabled(venue.organizationId);
       if (orgBlocked) return orgBlocked;
 
+      let decidedVenue = venue;
+      let decisionEmails: Array<{ userId: string; email: string | null }> = [];
       if (action === "approve") {
-        const decided = await approvePartnerVenue(id);
+        const decided = await approvePartnerVenue(admin.id, id);
         if (!decided.ok) {
           return NextResponse.json(
             { error: decided.error, missing: decided.missing, code: decided.code },
             { status: decided.status },
           );
         }
-        const emailTargets = [
-          ...new Set([
-            ...(venue.email ? [venue.email] : []),
-            ...decided.emails.map((row) => row.email).filter((value): value is string => Boolean(value)),
-          ]),
-        ];
-        for (const email of emailTargets) {
-          await sendEmail({
-            to: email,
-            subject: "Sala ta pe ePetrecere.md a fost aprobată! 🎉",
-            html: registrationStatusEmail({
-              name: venue.nameRo,
-              type: "venue",
-              approved: true,
-            }),
-          }).catch((err) => console.error("[email] Failed to send approval email:", err));
-        }
+        decidedVenue = decided.venue;
+        decisionEmails = decided.emails;
       } else {
-        const decided = await rejectPartnerVenue(id);
+        const decided = await rejectPartnerVenue(admin.id, id);
         if (!decided.ok) {
           return NextResponse.json(
             { error: decided.error, code: decided.code },
             { status: decided.status },
           );
         }
-        const emailTargets = [
-          ...new Set([
-            ...(venue.email ? [venue.email] : []),
-            ...decided.emails.map((row) => row.email).filter((value): value is string => Boolean(value)),
-          ]),
-        ];
-        for (const email of emailTargets) {
-          await sendEmail({
-            to: email,
-            subject: "Actualizare privind înregistrarea pe ePetrecere.md",
-            html: registrationStatusEmail({
-              name: venue.nameRo,
-              type: "venue",
-              approved: false,
-            }),
-          }).catch((err) => console.error("[email] Failed to send rejection email:", err));
-        }
+        decidedVenue = decided.venue;
+        decisionEmails = decided.emails;
       }
 
-      if (action === "approve" || venue.isActive) {
+      // Reject may defensively withdraw a previously active-but-corrupt venue.
+      // Invalidate both the pre-decision and authoritative post-decision slugs
+      // so no cached public card/profile survives that transition.
+      if (action === "approve" || venue.isActive || decidedVenue.isActive) {
         revalidateVendorCatalog("venue", {
-          profileSlugs: [venue.slug],
+          profileSlugs: [...new Set([venue.slug, decidedVenue.slug])],
           directory: true,
           homepage: true,
           services: true,
         });
+      }
+
+      const emailTargets = [
+        ...new Set([
+          ...(decidedVenue.email ? [decidedVenue.email] : []),
+          ...decisionEmails.map((row) => row.email).filter((value): value is string => Boolean(value)),
+        ]),
+      ];
+      const approved = action === "approve";
+      const approvalCtaUrl = approved
+        ? `https://epetrecere.md${isMultiHallEnabled()
+          ? `/dashboard/locatii/${decidedVenue.id}`
+          : "/dashboard/sala"}`
+        : undefined;
+      for (const email of emailTargets) {
+        await sendEmail({
+          to: email,
+          subject: approved
+            ? "Sala ta pe ePetrecere.md a fost aprobată! 🎉"
+            : "Actualizare privind înregistrarea pe ePetrecere.md",
+          html: registrationStatusEmail({
+            name: decidedVenue.nameRo,
+            type: "venue",
+            approved,
+            ctaUrl: approvalCtaUrl,
+          }),
+        }).catch((err) => console.error(
+          approved
+            ? "[email] Failed to send approval email:"
+            : "[email] Failed to send rejection email:",
+          err,
+        ));
       }
     }
 

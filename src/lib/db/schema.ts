@@ -194,21 +194,48 @@ export const scheduleBlockKindEnum = pgEnum("schedule_block_kind", [
 // Defined before `venues`/`venue_images`/`booking_requests` so their composite
 // foreign keys can reference venue_halls(id, venue_id) at module-eval time.
 
-export const partnerOrganizations = pgTable("partner_organizations", {
-  id: serial("id").primaryKey(),
-  type: partnerOrgTypeEnum("type").notNull().default("company"),
-  displayName: text("display_name").notNull(),
-  legalName: text("legal_name"),
-  idNumber: text("id_number"),
-  legalAddress: text("legal_address"),
-  billingEmail: text("billing_email"),
-  billingPhone: text("billing_phone"),
-  /** Server-side only. Never exposed in catalog, logs or public payloads. */
-  bankDetails: jsonb("bank_details").$type<Record<string, unknown>>(),
-  status: partnerEntityStatusEnum("status").notNull().default("active"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const partnerOrganizations = pgTable(
+  "partner_organizations",
+  {
+    id: serial("id").primaryKey(),
+    type: partnerOrgTypeEnum("type").notNull().default("company"),
+    displayName: text("display_name").notNull(),
+    legalName: text("legal_name"),
+    idNumber: text("id_number"),
+    legalAddress: text("legal_address"),
+    billingEmail: text("billing_email"),
+    billingPhone: text("billing_phone"),
+    /** Server-side only. Never exposed in catalog, logs or public payloads. */
+    bankDetails: jsonb("bank_details").$type<Record<string, unknown>>(),
+    /**
+     * Durable identity for an explicit organization-creation request. This is
+     * only an idempotency scope; authorization always comes from live
+     * organization membership. ON DELETE SET NULL leaves a non-authorizing
+     * tombstone while preserving the request id/hash for auditability.
+     */
+    creationActorUserId: uuid("creation_actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    creationRequestId: uuid("creation_request_id"),
+    creationRequestHash: text("creation_request_hash"),
+    status: partnerEntityStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("partner_organizations_actor_creation_request_uidx")
+      .on(t.creationActorUserId, t.creationRequestId)
+      .where(sql`${t.creationActorUserId} IS NOT NULL AND ${t.creationRequestId} IS NOT NULL`),
+    check(
+      "partner_organizations_creation_request_shape_chk",
+      sql`(${t.creationActorUserId} IS NULL
+          AND ${t.creationRequestId} IS NULL
+          AND ${t.creationRequestHash} IS NULL)
+        OR (${t.creationRequestId} IS NOT NULL
+          AND ${t.creationRequestHash} IS NOT NULL)`,
+    ),
+  ],
+);
 
 export const partnerOrganizationMembers = pgTable(
   "partner_organization_members",
@@ -239,6 +266,10 @@ export const venueHalls = pgTable(
     venueId: integer("venue_id")
       .references(() => venues.id, { onDelete: "cascade" })
       .notNull(),
+    /** Durable idempotency identity for one explicit Hall creation request. */
+    creationRequestId: uuid("creation_request_id"),
+    /** SHA-256 of the normalized create payload (the request UUID is excluded). */
+    creationPayloadHash: text("creation_payload_hash"),
     slug: text("slug").notNull(),
     nameRo: text("name_ro").notNull(),
     nameRu: text("name_ru"),
@@ -273,6 +304,9 @@ export const venueHalls = pgTable(
   },
   (t) => [
     uniqueIndex("venue_halls_venue_slug_unique").on(t.venueId, t.slug),
+    uniqueIndex("venue_halls_venue_creation_request_uidx")
+      .on(t.venueId, t.creationRequestId)
+      .where(sql`${t.creationRequestId} IS NOT NULL`),
     // Enables composite FKs (hall_id, venue_id) on child tables.
     unique("venue_halls_id_venue_unique").on(t.id, t.venueId),
     uniqueIndex("venue_halls_one_legacy_default_per_venue")
@@ -283,6 +317,10 @@ export const venueHalls = pgTable(
     check(
       "venue_halls_capacity_chk",
       sql`${t.capacityMin} IS NULL OR ${t.capacityMax} IS NULL OR ${t.capacityMax} >= ${t.capacityMin}`,
+    ),
+    check(
+      "venue_halls_creation_request_shape_chk",
+      sql`(${t.creationRequestId} IS NULL) = (${t.creationPayloadHash} IS NULL)`,
     ),
   ],
 );
@@ -753,6 +791,13 @@ export const venues = pgTable("venues", {
     () => partnerOrganizations.id,
     { onDelete: "restrict" },
   ),
+  /** Stable identity for one explicit "Add venue" submission. A browser
+   *  keeps this UUID across refresh/retry; the organization-scoped unique
+   *  index makes a lost HTTP response safe to repeat. */
+  onboardingSubmissionId: uuid("onboarding_submission_id"),
+  /** Hash of the normalized creation payload. Reusing an idempotency key for
+   *  different input is rejected instead of silently mutating a venue. */
+  onboardingSubmissionHash: text("onboarding_submission_hash"),
   /** IANA timezone for this location; drives canonical booking intervals. */
   timezone: text("timezone").default("Europe/Chisinau").notNull(),
   nameRo: text("name_ro").notNull(),
@@ -823,7 +868,18 @@ export const venues = pgTable("venues", {
   ogImageUrl: text("og_image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("venues_org_onboarding_submission_uidx")
+    .on(t.organizationId, t.onboardingSubmissionId)
+    .where(sql`${t.onboardingSubmissionId} IS NOT NULL`),
+  check(
+    "venues_onboarding_submission_shape_chk",
+    sql`(${t.onboardingSubmissionId} IS NULL AND ${t.onboardingSubmissionHash} IS NULL)
+      OR (${t.onboardingSubmissionId} IS NOT NULL
+        AND ${t.onboardingSubmissionHash} IS NOT NULL
+        AND ${t.organizationId} IS NOT NULL)`,
+  ),
+]);
 
 export const venueImages = pgTable(
   "venue_images",
@@ -856,7 +912,14 @@ export const venueImages = pgTable(
       foreignColumns: [venueHalls.id, venueHalls.venueId],
     }),
     index("venue_images_hall_idx").on(t.hallId),
+    uniqueIndex("venue_images_one_general_cover_per_venue_uidx")
+      .on(t.venueId)
+      .where(sql`${t.hallId} IS NULL AND ${t.isCover}`),
     check("venue_images_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
+    check(
+      "venue_images_hall_cannot_be_cover_chk",
+      sql`${t.hallId} IS NULL OR NOT ${t.isCover}`,
+    ),
   ],
 );
 
@@ -1498,6 +1561,10 @@ export const legalAcceptances = pgTable(
     check(
       "legal_acceptances_org_subject_chk",
       sql`${t.organizationId} IS NULL OR ${t.subjectType} = 'venue'`,
+    ),
+    check(
+      "legal_acceptances_org_profile_scope_chk",
+      sql`${t.organizationId} IS NULL OR (${t.artistId} IS NULL AND ${t.venueId} IS NULL)`,
     ),
   ],
 );

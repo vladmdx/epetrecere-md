@@ -6,6 +6,8 @@ import { bookingRequests, users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
 import { acquireUserMembershipMutationLocks } from "@/lib/partner/organization-members";
+import { validatePhone } from "@/lib/phone/validate";
+import { writeUserPhoneInDatabase } from "@/lib/auth/user-phone";
 
 interface ClerkWebhookEvent {
   type: string;
@@ -59,31 +61,64 @@ export async function POST(req: Request) {
     const phone = data.phone_numbers?.[0]?.phone_number || null;
 
     const existing = await db
-      .select()
+      .select({ id: users.id })
       .from(users)
       .where(eq(users.clerkId, data.id))
       .limit(1);
 
-    if (existing.length > 0) {
+    let appUserId = existing[0]?.id ?? null;
+    if (appUserId) {
       await db
         .update(users)
         .set({
           email,
           name,
-          phone,
           avatarUrl: data.image_url,
           updatedAt: new Date(),
         })
-        .where(eq(users.clerkId, data.id));
+        .where(eq(users.id, appUserId));
     } else {
-      await db.insert(users).values({
-        clerkId: data.id,
-        email,
-        name,
-        phone,
-        avatarUrl: data.image_url,
-        role: "user",
-      });
+      const [created] = await db
+        .insert(users)
+        .values({
+          clerkId: data.id,
+          email,
+          name,
+          phone: null,
+          avatarUrl: data.image_url,
+          role: "user",
+        })
+        .onConflictDoNothing()
+        .returning({ id: users.id });
+      appUserId = created?.id ?? null;
+      if (!appUserId) {
+        const [refound] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, data.id))
+          .limit(1);
+        appUserId = refound?.id ?? null;
+      }
+    }
+
+    // Clerk is only a bootstrap source. `user.updated` events can arrive out
+    // of order and must never overwrite a phone explicitly saved inside the
+    // product. A delayed/redelivered create also fills NULL only.
+    if (type === "user.created" && appUserId && phone) {
+      const normalized = validatePhone(phone);
+      if (normalized.ok) {
+        const phoneWrite = await writeUserPhoneInDatabase(
+          appUserId,
+          normalized.e164,
+          { onlyIfMissing: true },
+        );
+        if (!phoneWrite.ok) {
+          console.warn("[clerk-webhook] phone sync skipped", {
+            clerkId: data.id,
+            code: phoneWrite.code,
+          });
+        }
+      }
     }
   }
 

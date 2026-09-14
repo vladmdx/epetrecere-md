@@ -7,6 +7,7 @@ export const AVAIL_LOCK_GROUP = 280031;
 export const AVAIL_LOCK_ARTIST = 280033;
 export const LEGAL_LOCK_ORG = 280040;
 export const LEGAL_LOCK_USER = 280041;
+export const ACCOUNT_LOCK_PHONE = 280042;
 
 export type AvailabilityLockKeys = {
   venueId: number;
@@ -79,4 +80,18 @@ export async function acquireLegalScopeLock(
     userIds: scope.userId ? [scope.userId] : [],
     organizationIds: scope.organizationId ? [scope.organizationId] : [],
   });
+}
+
+/**
+ * Serialize claims for one canonical E.164 phone number. Callers that also
+ * mutate an account must acquire the user legal lock first; that ordering is
+ * shared by registration, settings, and Clerk synchronization.
+ */
+export async function acquireAccountPhoneLock(
+  tx: LockTx,
+  e164: string,
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${ACCOUNT_LOCK_PHONE}, hashtext(${e164}))`,
+  );
 }

@@ -153,7 +153,8 @@ export async function POST(req: NextRequest) {
   if (!u) {
     await db.insert(users).values({ clerkId, email: cu.primaryEmailAddress.emailAddress,
       name: [cu.firstName, cu.lastName].filter(Boolean).join(" ") || null,
-      phone: cu.phoneNumbers[0]?.phoneNumber ?? null, role: "user",
+      // Phone ownership is synchronized separately under a canonical lock.
+      phone: null, role: "user",
     }).onConflictDoNothing();
     [u] = await db.select({ id: users.id, phone: users.phone })
       .from(users).where(eq(users.clerkId, clerkId)).limit(1);
@@ -165,14 +166,17 @@ export async function POST(req: NextRequest) {
   // onboarding it does NOT: the profile is created only after this call
   // succeeds, deliberately, so nobody ends up live without a contract. The
   // ids are backfilled by register-artist / register-venue right afterwards.
-  const [a] = subjectType === "artist"
+  // Organization evidence is bound to the legal holder once, not to whichever
+  // Venue happens to be reachable through the signer's legacy user pointer.
+  // Profile ids are used only by the personal/legacy registration flows.
+  const [a] = !organizationId && subjectType === "artist"
     ? await db
         .select({ id: artists.id })
         .from(artists)
         .where(eq(artists.userId, u.id))
         .limit(1)
     : [];
-  const [v] = subjectType === "venue"
+  const [v] = !organizationId && subjectType === "venue"
     ? await db
         .select({ id: venues.id })
         .from(venues)
@@ -189,8 +193,8 @@ export async function POST(req: NextRequest) {
   const recordedPack = await recordLegalAcceptancePack({
     userId: u.id,
     subjectType,
-    artistId: a?.id ?? null,
-    venueId: v?.id ?? null,
+    artistId: organizationId ? null : a?.id ?? null,
+    venueId: organizationId ? null : v?.id ?? null,
     organizationId: organizationId ?? null,
     locale,
     signatureName,

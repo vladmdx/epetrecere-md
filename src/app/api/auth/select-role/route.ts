@@ -14,9 +14,12 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, users, venues } from "@/lib/db/schema";
-import { pickUniqueSlug } from "@/lib/utils/slugify";
+import { users } from "@/lib/db/schema";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import {
+  completeVenueRoleSelection,
+  selectRoleInDatabase,
+} from "@/lib/auth/select-role";
 
 const schema = z.object({
   role: z.enum(["client", "artist", "venue"]),
@@ -64,7 +67,9 @@ export async function POST(req: Request) {
           name:
             [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
             null,
-          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
+          // Phone is claimed by /api/auth/set-phone under its canonical
+          // identity lock; role selection must not create a duplicate.
+          phone: null,
           avatarUrl: clerkUser.imageUrl || null,
           role: "user",
         })
@@ -96,110 +101,100 @@ export async function POST(req: Request) {
     }
 
     const role = parsed.data.role;
-    const [[artistProfile], [venueProfile]] = await Promise.all([
-      db
-        .select({ id: artists.id })
-        .from(artists)
-        .where(eq(artists.userId, appUser.id))
-        .limit(1),
-      db
-        .select({ id: venues.id })
-        .from(venues)
-        .where(eq(venues.userId, appUser.id))
-        .limit(1),
-    ]);
-
-    const roleConflict =
-      (role === "artist" && Boolean(venueProfile)) ||
-      (role === "venue" && (Boolean(artistProfile) || appUser.role === "artist")) ||
-      (role === "client" &&
-        (Boolean(artistProfile) || Boolean(venueProfile) || appUser.role === "artist"));
-    if (roleConflict) {
+    const multiHallEnabled = isMultiHallEnabled();
+    const selected = await selectRoleInDatabase({
+      userId: appUser.id,
+      role,
+      baseName: appUser.name || "Sală nouă",
+      multiHallEnabled,
+    });
+    if (!selected.ok) {
       return NextResponse.json(
-        {
-          error:
-            "Rolul contului este deja stabilit. Folosește un cont separat pentru alt tip de profil.",
-        },
-        { status: 409 },
+        { error: selected.error, code: selected.code },
+        { status: selected.status },
       );
     }
 
-    if (role === "artist") {
-      // Set role to artist immediately. Onboarding still required to
-      // create the artist row (which will be inactive until admin approves).
-      await db
-        .update(users)
-        .set({
-          role: "artist",
-          onboardingComplete: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, appUser.id));
-    } else if (role === "venue") {
-      // Create a stub venue row so /dashboard/sala detects ownership.
-      // The user can fill in details via the venue onboarding flow.
-      const [existing] = await db
-        .select({ id: venues.id, organizationId: venues.organizationId })
-        .from(venues)
-        .where(eq(venues.userId, appUser.id))
-        .limit(1);
-      let venueId = existing?.id ?? null;
-      let organizationId = existing?.organizationId ?? null;
-      if (!existing) {
-        const baseName = appUser.name || "Sală nouă";
-        // Clean slug — same helper as register-venue. Conflicts get -2/-3
-        // suffixes; no timestamp noise.
-        const slug = await pickUniqueSlug(baseName, async (candidate) => {
-          const [hit] = await db
-            .select({ id: venues.id })
-            .from(venues)
-            .where(eq(venues.slug, candidate))
-            .limit(1);
-          return !!hit;
-        });
-        const [created] = await db.insert(venues).values({
-          userId: appUser.id,
-          nameRo: baseName,
-          slug,
-          phone: "",
-          city: "Chișinău",
-          isActive: false,
-          // Launch phase parity with register-venue.
-          isFeatured: true,
-          facilities: [],
-        }).returning({ id: venues.id });
-        venueId = created.id;
-      }
-      if (isMultiHallEnabled() && venueId) {
-        const { ensureDraftOrganization } = await import("@/lib/partner/onboarding");
-        const baseName = appUser.name || "Sală nouă";
-        const org = await ensureDraftOrganization(
-          { id: appUser.id, role: appUser.role, isGlobalAdmin: false },
-          { displayName: baseName, type: "company" },
+    if (role === "venue") {
+      if (!selected.venueId) {
+        return NextResponse.json(
+          {
+            error: "Profilul localului nu a putut fi inițializat. Reîncearcă.",
+            code: "VENUE_STUB_CONFLICT",
+          },
+          { status: 409 },
         );
-        organizationId = org.id;
-        await db
-          .update(venues)
-          .set({ organizationId: org.id, updatedAt: new Date() })
-          .where(eq(venues.id, venueId));
       }
-      await db
-        .update(users)
-        .set({ onboardingComplete: true, updatedAt: new Date() })
-        .where(eq(users.id, appUser.id));
-      if (isMultiHallEnabled()) {
+      const venueId = selected.venueId;
+      let organizationId = selected.organizationId;
+      if (selected.needsOrganizationAttachment) {
+        const {
+          attachVenueRoleDraftToOrganization,
+          bootstrapDraftOrganization,
+          OrganizationDraftUpdateError,
+        } = await import("@/lib/partner/onboarding");
+        const baseName = appUser.name || "Sală nouă";
+        let org;
+        try {
+          org = await bootstrapDraftOrganization(selected.user, {
+            displayName: baseName,
+            type: "company",
+          });
+        } catch (error) {
+          if (
+            error instanceof OrganizationDraftUpdateError
+            && error.code === "ORGANIZATION_SELECTION_REQUIRED"
+          ) {
+            // This is a successful venue-role choice with an unresolved
+            // organization, not a role failure. Keep onboarding incomplete
+            // and let the onboarding screen show its explicit org selector.
+            return NextResponse.json({
+              success: true,
+              role,
+              organizationSelectionRequired: true,
+            });
+          }
+          throw error;
+        }
+        organizationId = org.id;
+        const attached = await attachVenueRoleDraftToOrganization(
+          selected.user,
+          venueId,
+          organizationId,
+        );
+        if (!attached.ok) {
+          return NextResponse.json(
+            { error: attached.error, code: "FORBIDDEN" },
+            { status: attached.status },
+          );
+        }
+        organizationId = attached.organizationId;
+      }
+      const completed = await completeVenueRoleSelection({
+        userId: selected.user.id,
+        venueId,
+        multiHallEnabled,
+      });
+      if (!completed) {
+        return NextResponse.json(
+          { error: "Forbidden", code: "FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+      if (multiHallEnabled) {
         return NextResponse.json({ success: true, role, organizationId, venueId });
       }
-    } else {
-      // Client — just mark onboarding complete.
-      await db
-        .update(users)
-        .set({ onboardingComplete: true, updatedAt: new Date() })
-        .where(eq(users.id, appUser.id));
     }
 
     return NextResponse.json({ success: true, role });
   } catch (err) {
+    const { OrganizationDraftUpdateError } = await import("@/lib/partner/onboarding");
+    if (err instanceof OrganizationDraftUpdateError) {
+      return NextResponse.json(
+        { error: err.code, code: err.code },
+        { status: err.status },
+      );
+    }
     console.error("[select-role] Error:", err);
     return NextResponse.json(
       { error: "Internal server error" },

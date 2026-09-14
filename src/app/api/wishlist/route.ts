@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -92,6 +92,7 @@ export async function GET() {
             and(
               inArray(venueImages.venueId, venueIds),
               eq(venueImages.isCover, true),
+              isNull(venueImages.hallId),
             ),
           )
       : Promise.resolve([]),

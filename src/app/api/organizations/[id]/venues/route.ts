@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { venues } from "@/lib/db/schema";
+import { venueHalls, venues } from "@/lib/db/schema";
 import { getCurrentAppUser, requireOrganizationCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
 import { saveVenueDraft } from "@/lib/partner/onboarding";
@@ -28,5 +28,15 @@ export async function POST(req: Request, ctx: Ctx) {
   const body = await req.json().catch(() => null);
   const saved = await saveVenueDraft(user, { ...body, organizationId });
   if (!saved.ok) return jsonError(saved.error, saved.status ?? 400, saved);
-  return NextResponse.json({ venue: saved.venue });
+  // Return authoritative Hall statuses after the venue transaction commits.
+  // If the first attachment response was lost, an identical retry must still
+  // tell the client that its pending legacy Hall was reopened to draft.
+  const halls = await db
+    .select({ id: venueHalls.id, status: venueHalls.status })
+    .from(venueHalls)
+    .where(eq(venueHalls.venueId, saved.venue.id));
+  return NextResponse.json({
+    venue: saved.venue,
+    halls,
+  });
 }

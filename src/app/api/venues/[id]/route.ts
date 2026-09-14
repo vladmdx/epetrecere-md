@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { venues, venueImages, reviews, redirects } from "@/lib/db/schema";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, isNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { requireVenueCapability, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
@@ -40,7 +40,14 @@ export async function GET(
   }
 
   const [images, venueReviews] = await Promise.all([
-    db.select().from(venueImages).where(eq(venueImages.venueId, venueId)).orderBy(asc(venueImages.sortOrder)),
+    db
+      .select()
+      .from(venueImages)
+      .where(and(
+        eq(venueImages.venueId, venueId),
+        isNull(venueImages.hallId),
+      ))
+      .orderBy(asc(venueImages.sortOrder), asc(venueImages.id)),
     db.select().from(reviews).where(and(eq(reviews.venueId, venueId), eq(reviews.isApproved, true))).orderBy(desc(reviews.createdAt)).limit(20),
   ]);
 

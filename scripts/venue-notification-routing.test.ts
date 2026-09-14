@@ -43,10 +43,27 @@ test("new counteroffer notifications and email CTAs use the correct vendor desti
 });
 
 test("venue approval producer and email route to the venue home while artist/rejection routes remain unchanged", () => {
-  const source = readFileSync("src/app/api/admin/registration-requests/route.ts", "utf8");
-  const venueBranch = source.slice(source.indexOf('} else if (type === "venue")'));
-  assert.match(venueBranch, /actionUrl: "\/dashboard\/sala"/);
-  assert.match(source.slice(0, source.indexOf('} else if (type === "venue")')), /actionUrl: "\/dashboard"/);
+  const route = readFileSync("src/app/api/admin/registration-requests/route.ts", "utf8");
+  const producer = readFileSync("src/lib/partner/registration-decision.ts", "utf8");
+  const venueBranch = route.slice(route.indexOf('} else if (type === "venue")'));
+  assert.match(producer, /isMultiHallEnabled\(\)[\s\S]*`\/dashboard\/locatii\/\$\{venueId\}`[\s\S]*"\/dashboard\/sala"/);
+  assert.match(venueBranch, /isMultiHallEnabled\(\)[\s\S]*`\/dashboard\/locatii\/\$\{decidedVenue\.id\}`[\s\S]*"\/dashboard\/sala"/);
+  assert.match(venueBranch, /registrationStatusEmail\(\{[\s\S]*ctaUrl: approvalCtaUrl/);
+  const artistDecision = producer.slice(
+    producer.indexOf("async function decidePartnerArtist"),
+    producer.indexOf("export function approvePartnerArtist"),
+  );
+  assert.match(artistDecision, /type: "registration_approved"[\s\S]*actionUrl: "\/dashboard"/);
+  assert.match(artistDecision, /type: "registration_rejected"[\s\S]*actionUrl: "\/contact"/);
+  assert.match(
+    registrationStatusEmail({
+      name: "QA",
+      type: "venue",
+      approved: true,
+      ctaUrl: "https://epetrecere.md/dashboard/locatii/42",
+    }),
+    /href="https:\/\/epetrecere\.md\/dashboard\/locatii\/42"/,
+  );
   assert.match(registrationStatusEmail({ name: "QA", type: "venue", approved: true }), /href="https:\/\/epetrecere\.md\/dashboard\/sala"/);
   assert.match(registrationStatusEmail({ name: "QA", type: "artist", approved: true }), /href="https:\/\/epetrecere\.md\/dashboard"/);
   assert.match(registrationStatusEmail({ name: "QA", type: "venue", approved: false }), /href="https:\/\/epetrecere\.md\/contact"/);

@@ -5,6 +5,7 @@
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
@@ -51,6 +52,7 @@ const TZ = "Europe/Chisinau";
 
 const ids = {
   owner: "",
+  reviewer: "",
   client: "",
   artistUser: "",
   org: 0,
@@ -97,6 +99,8 @@ before(async () => {
   // Disposable snapshots can lag schema.ts (artist_name_snapshot on 6d5bec5).
   await db.execute(sql`ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS artist_name_snapshot text`);
   ids.owner = await mkUser("owner", "+37369111111");
+  ids.reviewer = await mkUser("reviewer");
+  await db.update(users).set({ role: "admin" }).where(eq(users.id, ids.reviewer));
   ids.client = await mkUser("client");
   ids.artistUser = await mkUser("artist");
   const [artist] = await db
@@ -184,6 +188,7 @@ test("A: fresh role stub → save reuses venue; retry is idempotent; intent=crea
   const second = await saveVenueDraft(appUser(ids.owner), {
     organizationId: org.id,
     createIntent: true,
+    createRequestId: randomUUID(),
     name: MARK + "Local 2",
     phone: PHONE,
     city: "Chișinău",
@@ -247,13 +252,13 @@ test("B: usable hall status is only active|pending; last usable cannot archive",
     assert.equal(isUsableHallStatus(status), false);
   }
 
-  assert.equal((await archiveHall(halls.active!)).ok, true);
-  assert.equal((await archiveHall(halls.pending!)).ok, false);
-  const lastPending = await archiveHall(halls.pending!);
+  assert.equal((await archiveHall(ids.owner, halls.active!)).ok, true);
+  assert.equal((await archiveHall(ids.owner, halls.pending!)).ok, false);
+  const lastPending = await archiveHall(ids.owner, halls.pending!);
   assert.equal(lastPending.ok, false);
   if (!lastPending.ok) assert.equal(lastPending.code, "LAST_USABLE_HALL");
 
-  const draftOk = await archiveHall(halls.draft!);
+  const draftOk = await archiveHall(ids.owner, halls.draft!);
   assert.equal(draftOk.ok, true, "non-usable halls can still be archived");
 
   const [restored] = await db
@@ -267,9 +272,9 @@ test("B: usable hall status is only active|pending; last usable cannot archive",
       capacityMax: 20,
     })
     .returning({ id: venueHalls.id });
-  const pendingNow = await archiveHall(halls.pending!);
+  const pendingNow = await archiveHall(ids.owner, halls.pending!);
   assert.equal(pendingNow.ok, true);
-  const leftover = await archiveHall(restored.id);
+  const leftover = await archiveHall(ids.owner, restored.id);
   assert.equal(leftover.ok, false);
   if (!leftover.ok) assert.equal(leftover.code, "LAST_USABLE_HALL");
 
@@ -296,9 +301,14 @@ test("B: two concurrent archives of the last two usable halls: exactly one succe
   const [b] = await db.insert(venueHalls).values({
     venueId: venue.id, slug: "b", nameRo: "B", status: "pending", capacityMin: 10, capacityMax: 20,
   }).returning({ id: venueHalls.id });
-  const race = await Promise.all([archiveHall(a.id), archiveHall(b.id)]);
+  const race = await Promise.all([
+    archiveHall(ids.owner, a.id),
+    archiveHall(ids.owner, b.id),
+  ]);
   const ok = race.filter((item) => item.ok);
-  const last = race.filter((item) => !item.ok && "code" in item && item.code === "LAST_USABLE_HALL");
+  const last = race.filter((item) =>
+    !item.ok && "code" in item &&
+    (item.code === "LAST_USABLE_HALL" || item.code === "HALL_CHANGED"));
   assert.equal(ok.length, 1);
   assert.equal(last.length, 1);
   const leftover = await db.select({ status: venueHalls.status }).from(venueHalls).where(eq(venueHalls.venueId, venue.id));
@@ -372,7 +382,7 @@ test("B: archived hall block/conflict does not hit sister; sister data stays int
   assert.equal(before.available, false);
   assert.equal(before.code, "CONFLICT_GROUP");
 
-  const archived = await archiveHall(hallA.id);
+  const archived = await archiveHall(ids.owner, hallA.id);
   assert.equal(archived.ok, true, JSON.stringify(archived));
 
   const after = await evaluateVenueAvailability({
@@ -504,14 +514,14 @@ test("E: org-backed approve/reject is FEATURE_DISABLED before mutation when flag
   const [org] = await db.select({ status: partnerOrganizations.status }).from(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   const [venue] = await db.select({ isActive: venues.isActive, organizationId: venues.organizationId }).from(venues).where(eq(venues.id, ids.venue));
   flagOff();
-  const approved = await approvePartnerVenue(ids.venue);
+  const approved = await approvePartnerVenue(ids.reviewer, ids.venue);
   assert.equal(approved.ok, false);
   if (!approved.ok) {
     assert.equal(approved.status, 404);
     assert.equal(approved.code, "FEATURE_DISABLED");
     assert.equal(approved.error, "FEATURE_DISABLED");
   }
-  const rejected = await rejectPartnerVenue(ids.venue);
+  const rejected = await rejectPartnerVenue(ids.reviewer, ids.venue);
   assert.equal(rejected.ok, false);
   if (!rejected.ok) {
     assert.equal(rejected.status, 404);
@@ -537,7 +547,7 @@ test("E: org-backed approve/reject is FEATURE_DISABLED before mutation when flag
     city: "Chișinău",
     address: "str. Legacy 1",
   }).returning({ id: venues.id });
-  const legacyApprove = await approvePartnerVenue(legacy.id);
+  const legacyApprove = await approvePartnerVenue(ids.reviewer, legacy.id);
   if (!legacyApprove.ok) {
     assert.notEqual(legacyApprove.code, "FEATURE_DISABLED");
   }
@@ -545,7 +555,7 @@ test("E: org-backed approve/reject is FEATURE_DISABLED before mutation when flag
   flagOn();
 });
 
-test("E: hall-specific image writes are blocked with FEATURE_DISABLED and no partial updates", async () => {
+test("E: Hall images use Hall PATCH and generic gallery writes stay general-only", async () => {
   flagOn();
   const [hall] = await db.insert(venueHalls).values({
     venueId: ids.venue,
@@ -566,22 +576,25 @@ test("E: hall-specific image writes are blocked with FEATURE_DISABLED and no par
     () => replaceVenueImages(ids.venue, hall.id, ["https://example.com/hall-2.jpg"]),
     (error: unknown) => error instanceof MultiHallFeatureDisabledError,
   );
-  const reorder = await reorderVenueImages(ids.venue, [
+  const reorder = await reorderVenueImages(ids.owner, ids.venue, [
     { id: general.id, sortOrder: 5 },
     { id: hallImg.id, sortOrder: 6 },
   ]);
   assert.equal(reorder.ok, false);
   if (!reorder.ok) {
-    assert.equal(reorder.status, 404);
-    assert.equal(reorder.error, "FEATURE_DISABLED");
-    assert.equal(reorder.code, "FEATURE_DISABLED");
+    assert.equal(reorder.status, 400);
+    assert.equal(reorder.code, "HALL_IMAGES_USE_HALL_PATCH");
   }
   const afterRefuse = await db.select().from(venueImages).where(eq(venueImages.venueId, ids.venue));
   assert.equal(afterRefuse.find((row) => row.id === general.id)?.sortOrder, general.sortOrder);
   assert.equal(afterRefuse.find((row) => row.id === hallImg.id)?.sortOrder, hallImg.sortOrder);
   assert.equal(afterRefuse.find((row) => row.id === hallImg.id)?.url, hallImg.url);
 
-  const generalOnly = await reorderVenueImages(ids.venue, [{ id: general.id, sortOrder: 3 }]);
+  const generalOnly = await reorderVenueImages(
+    ids.owner,
+    ids.venue,
+    [{ id: general.id, sortOrder: 3 }],
+  );
   assert.equal(generalOnly.ok, true);
   await replaceVenueImages(ids.venue, null, ["https://example.com/general-edit.jpg"]);
   const afterGeneral = await db.select().from(venueImages).where(eq(venueImages.venueId, ids.venue));
@@ -589,11 +602,15 @@ test("E: hall-specific image writes are blocked with FEATURE_DISABLED and no par
   assert.ok(afterGeneral.some((row) => row.hallId == null && row.url === "https://example.com/general-edit.jpg"));
 
   flagOn();
-  const onReorder = await reorderVenueImages(ids.venue, [
+  const onReorder = await reorderVenueImages(ids.owner, ids.venue, [
     { id: afterGeneral.find((row) => row.hallId == null)!.id, sortOrder: 0 },
     { id: hallImg.id, sortOrder: 1 },
   ]);
-  assert.equal(onReorder.ok, true);
+  assert.equal(onReorder.ok, false);
+  if (!onReorder.ok) {
+    assert.equal(onReorder.status, 400);
+    assert.equal(onReorder.code, "HALL_IMAGES_USE_HALL_PATCH");
+  }
   await db.delete(venueImages).where(eq(venueImages.venueId, ids.venue));
   await db.delete(venueHalls).where(eq(venueHalls.id, hall.id));
 });

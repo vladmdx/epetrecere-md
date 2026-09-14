@@ -8,7 +8,10 @@ import { saveOrganizationProfile } from "@/lib/partner/onboarding";
 import { organizationHasValidContract, organizationContractRows } from "@/lib/partner/legal";
 import { organizationWriteCapability } from "@/lib/partner/organization-write";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
-import { redactOrganizationForRole } from "@/lib/partner/organization-dto";
+import {
+  organizationRoleHasCapability,
+  redactOrganizationForRole,
+} from "@/lib/partner/organization-dto";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -21,7 +24,12 @@ export async function GET(_req: Request, ctx: Ctx) {
   const orgVenues = await db.select({
     id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive, city: venues.city,
   }).from(venues).where(eq(venues.organizationId, organizationId));
-  const contracts = await organizationContractRows(organizationId);
+  // Contract evidence is owner-only (`manage_legal`). A staff member may see
+  // the operational organization/venue DTO, but not acceptance metadata or
+  // signed-copy URLs.
+  const contracts = organizationRoleHasCapability(access.role, "manage_legal")
+    ? await organizationContractRows(organizationId)
+    : [];
   const billing = access.role === "owner" || access.role === "admin"
     ? { billingEmail: org.billingEmail, billingPhone: org.billingPhone, bankDetails: org.bankDetails }
     : { billingEmail: null, billingPhone: null, bankDetails: null };
@@ -56,11 +64,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (!access.ok) return jsonAccess(access);
   const blocked = jsonIfMultiHallDisabled();
   if (blocked) return blocked;
-  const saved = await saveOrganizationProfile(organizationId, body);
+  const saved = await saveOrganizationProfile(access.user, organizationId, body);
   if (!saved.ok) return jsonError(saved.error, saved.status ?? 400, saved);
   return NextResponse.json({
-    organization: saved.organization
-      ? redactOrganizationForRole(saved.organization, access.role)
-      : saved.organization,
+    organization: redactOrganizationForRole(saved.organization, saved.role),
   });
 }

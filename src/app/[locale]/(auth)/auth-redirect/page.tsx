@@ -40,6 +40,7 @@ export default function AuthRedirectPage() {
   const [showRoleSelect, setShowRoleSelect] = useState(false);
   const [selectedRole, setSelectedRole] = useState<RoleChoice>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const [phoneInput, setPhoneInput] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -112,9 +113,10 @@ export default function AuthRedirectPage() {
         }
 
         const res = await fetch(
-          // Cache-buster query param — defeats any intermediary that
-          // ignores cache: "no-store" headers (some Edge proxies do).
-          `/api/auth/check-role?email=${encodeURIComponent(email)}&_t=${Date.now()}`,
+          // The endpoint is authenticated and self-scoped. The cache-buster
+          // carries no identity data and defeats intermediaries that ignore
+          // the explicit no-store request headers.
+          `/api/auth/check-role?_t=${Date.now()}`,
           {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
@@ -138,6 +140,11 @@ export default function AuthRedirectPage() {
           } else {
             router.replace("/dashboard/onboarding");
           }
+        } else if (data.hasVenue && !data.onboardingComplete) {
+          // A venue stub can exist before the user chooses one of several
+          // organizations. Keep that resumable selection in onboarding on
+          // every sign-in; the stub alone is not completed onboarding.
+          router.replace("/dashboard/venue-onboarding");
         } else if (data.isNewUser === true) {
           // New user — collect phone first if missing, then role picker.
           // NOTE: We do NOT bypass via wizard-data anymore. Stale wizard data
@@ -230,17 +237,28 @@ export default function AuthRedirectPage() {
 
   async function handleRoleSelect() {
     if (!selectedRole) return;
+    setRoleError(null);
     setSubmitting(true);
 
     // Persist the chosen role IMMEDIATELY so the user is treated as
     // artist/venue from the next request — not only after onboarding
-    // finishes. Falls through to the legacy redirect on failure.
+    // finishes. A rejected role selection must keep the user on this screen:
+    // redirecting anyway would let an artist enter venue onboarding (or the
+    // inverse) after the server correctly returned ROLE_CONFLICT.
     const roleRes = await fetch("/api/auth/select-role", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: selectedRole }),
     }).catch(() => null);
-    const rolePayload = roleRes?.ok ? await roleRes.json().catch(() => null) : null;
+    const rolePayload = await roleRes?.json().catch(() => null);
+    if (!roleRes?.ok) {
+      setRoleError(
+        rolePayload?.error
+          || "Rolul nu a putut fi salvat. Verifică alegerea și încearcă din nou.",
+      );
+      setSubmitting(false);
+      return;
+    }
 
     if (selectedRole === "client") {
       // Same priority as in checkRole: search-next > deep-link > wizard.
@@ -371,7 +389,10 @@ export default function AuthRedirectPage() {
           <div className="space-y-3">
             {/* Client */}
             <button
-              onClick={() => setSelectedRole("client")}
+              onClick={() => {
+                setSelectedRole("client");
+                setRoleError(null);
+              }}
               className={`flex w-full items-center gap-4 rounded-xl border-2 p-5 text-left transition-all ${
                 selectedRole === "client"
                   ? "border-[#C9A84C] bg-[#C9A84C]/10 shadow-[0_0_20px_rgba(201,168,76,0.15)]"
@@ -393,7 +414,10 @@ export default function AuthRedirectPage() {
 
             {/* Artist */}
             <button
-              onClick={() => setSelectedRole("artist")}
+              onClick={() => {
+                setSelectedRole("artist");
+                setRoleError(null);
+              }}
               className={`flex w-full items-center gap-4 rounded-xl border-2 p-5 text-left transition-all ${
                 selectedRole === "artist"
                   ? "border-[#C9A84C] bg-[#C9A84C]/10 shadow-[0_0_20px_rgba(201,168,76,0.15)]"
@@ -415,7 +439,10 @@ export default function AuthRedirectPage() {
 
             {/* Venue */}
             <button
-              onClick={() => setSelectedRole("venue")}
+              onClick={() => {
+                setSelectedRole("venue");
+                setRoleError(null);
+              }}
               className={`flex w-full items-center gap-4 rounded-xl border-2 p-5 text-left transition-all ${
                 selectedRole === "venue"
                   ? "border-[#C9A84C] bg-[#C9A84C]/10 shadow-[0_0_20px_rgba(201,168,76,0.15)]"
@@ -435,6 +462,12 @@ export default function AuthRedirectPage() {
               </div>
             </button>
           </div>
+
+          {roleError && (
+            <p role="alert" className="mt-3 text-sm text-red-400">
+              {roleError}
+            </p>
+          )}
 
           <button
             onClick={handleRoleSelect}

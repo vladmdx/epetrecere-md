@@ -5,7 +5,7 @@ import {
 } from "@/lib/venue-access";
 import { jsonError } from "@/lib/http/json";
 import {
-  ensureDraftOrganization,
+  createDraftOrganization,
   OrganizationDraftUpdateError,
 } from "@/lib/partner/onboarding";
 import { organizationCreateSchema, validatePhoneOrError } from "@/lib/partner/validation";
@@ -39,15 +39,32 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const body = await req.json().catch(() => null);
   const parsed = organizationCreateSchema.safeParse(body);
-  if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
+  if (!parsed.success) {
+    return jsonError("Validation failed", 400, {
+      code: "VALIDATION_FAILED",
+      details: parsed.error.issues,
+    });
+  }
   if (parsed.data.billingPhone) {
     const phone = validatePhoneOrError(parsed.data.billingPhone);
-    if (!phone.ok) return jsonError(phone.message, 400, { field: "billingPhone" });
+    if (!phone.ok) {
+      return jsonError(phone.message, 400, {
+        code: "INVALID_PHONE",
+        field: "billingPhone",
+      });
+    }
     parsed.data.billingPhone = phone.e164;
   }
   try {
-    const organization = await ensureDraftOrganization(user, parsed.data);
-    return NextResponse.json({ organization: redactOrganizationForRole(organization, "owner") });
+    // POST is an explicit create operation. It never scans for or mutates an
+    // unrelated draft; retries are scoped by organizationCreateRequestId.
+    const organization = await createDraftOrganization(user, parsed.data);
+    return NextResponse.json({
+      // createDraftOrganization commits only while the caller holds a live
+      // owner membership. Avoid a post-commit authorization race that could
+      // turn a successful create into an ambiguous 403 response.
+      organization: redactOrganizationForRole(organization, "owner"),
+    });
   } catch (error) {
     if (error instanceof OrganizationDraftUpdateError) {
       return jsonError(error.code, error.status, { code: error.code });

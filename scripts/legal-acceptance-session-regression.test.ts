@@ -35,7 +35,6 @@ import {
 } from "../src/lib/legal/contract-delivery";
 import {
   ensureDraftOrganization,
-  OrganizationDraftUpdateError,
   saveOrganizationProfile,
 } from "../src/lib/partner/onboarding";
 import type { AppUser } from "../src/lib/venue-access";
@@ -152,7 +151,7 @@ before(async () => {
     legalAddress: IDENTITY.legalAddress,
   });
   ids.org = org.id;
-  const saved = await saveOrganizationProfile(ids.org, {
+  const saved = await saveOrganizationProfile(appUser(ids.owner), ids.org, {
     type: "company",
     legalName: IDENTITY.legalName,
     idNumber: IDENTITY.idNumber,
@@ -281,19 +280,18 @@ test("2.1 pack with reguli-marketplace 1.0 can still sign a complete 2.2 session
 });
 
 test("organization create/update path cannot mutate signed legal identity", async () => {
-  await assert.rejects(
-    () => ensureDraftOrganization(appUser(ids.owner), {
-      displayName: MARK + "Org",
-      type: IDENTITY.partnerType,
-      legalName: IDENTITY.legalName,
-      idNumber: IDENTITY.idNumber,
-      legalAddress: "Chișinău, str. Mutată 99",
-    }),
-    (error: unknown) =>
-      error instanceof OrganizationDraftUpdateError &&
-      error.code === "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION" &&
-      error.status === 409,
-  );
+  const update = await saveOrganizationProfile(appUser(ids.owner), ids.org, {
+    displayName: MARK + "Org",
+    type: IDENTITY.partnerType,
+    legalName: IDENTITY.legalName,
+    idNumber: IDENTITY.idNumber,
+    legalAddress: "Chișinău, str. Mutată 99",
+  });
+  assert.equal(update.ok, false);
+  if (!update.ok) {
+    assert.equal(update.error, "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION");
+    assert.equal(update.status, 409);
+  }
   const [organization] = await db
     .select({ legalAddress: partnerOrganizations.legalAddress })
     .from(partnerOrganizations)
@@ -303,16 +301,13 @@ test("organization create/update path cannot mutate signed legal identity", asyn
 
 test("signing and organization POST-style update share one legal-scope lock", async () => {
   const signing = recordLegalAcceptancePack(await signInput(ids.raceOwner, ids.raceOrg));
-  const editing = ensureDraftOrganization(appUser(ids.raceOwner), {
+  const editing = saveOrganizationProfile(appUser(ids.raceOwner), ids.raceOrg, {
     displayName: MARK + "Race",
     type: IDENTITY.partnerType,
     legalName: IDENTITY.legalName,
     idNumber: IDENTITY.idNumber,
     legalAddress: "Chișinău, str. Cursa 77",
-  }).then(
-    () => ({ ok: true as const }),
-    (error: unknown) => ({ ok: false as const, error }),
-  );
+  });
   const [signed, edited] = await Promise.all([signing, editing]);
   const [organization] = await db
     .select({ legalAddress: partnerOrganizations.legalAddress })
@@ -325,10 +320,9 @@ test("signing and organization POST-style update share one legal-scope lock", as
 
   if (signed.ok) {
     assert.equal(edited.ok, false);
-    assert.ok(
-      !edited.ok && edited.error instanceof OrganizationDraftUpdateError,
-      "the losing update must return the legal-holder conflict",
-    );
+    if (!edited.ok) {
+      assert.equal(edited.error, "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION");
+    }
     assert.equal(organization.legalAddress, IDENTITY.legalAddress);
     assert.equal(rows.length, VENUE_REQUIRED_DOCS.length);
   } else {
@@ -842,6 +836,19 @@ test("artist + organizationId is rejected", async () => {
   });
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "ORGANIZATION_SUBJECT_REQUIRED");
+});
+
+test("organization evidence cannot be linked to one artist or Venue profile", async () => {
+  for (const profileLink of [{ artistId: 1 }, { venueId: 1 }]) {
+    const result = await recordLegalAcceptancePack({
+      ...(await signInput(ids.owner, ids.org)),
+      ...profileLink,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, "ORGANIZATION_PROFILE_LINK_NOT_ALLOWED");
+    }
+  }
 });
 
 test("FEATURE_MULTI_HALL off preserves legacy user-scoped artist signing", async () => {

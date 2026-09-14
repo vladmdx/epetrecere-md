@@ -18,7 +18,7 @@ import {
   venues,
   venueImages,
 } from "@/lib/db/schema";
-import { and, asc, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 export type NextEvent = {
   id: number;
@@ -116,8 +116,15 @@ export async function getArtistNextEvent(
       const imgRows = await db
         .select({ url: venueImages.url })
         .from(venueImages)
-        .where(eq(venueImages.venueId, sibling.venueId))
-        .orderBy(asc(venueImages.sortOrder))
+        .where(and(
+          eq(venueImages.venueId, sibling.venueId),
+          isNull(venueImages.hallId),
+        ))
+        .orderBy(
+          desc(venueImages.isCover),
+          asc(venueImages.sortOrder),
+          asc(venueImages.id),
+        )
         .limit(1);
       venueImage = imgRows[0]?.url ?? null;
     }

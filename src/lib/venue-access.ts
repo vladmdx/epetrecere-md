@@ -98,6 +98,14 @@ export type AppUser = {
   isGlobalAdmin: boolean;
 };
 
+function toAppUser(row: { id: string; role: string }): AppUser {
+  return {
+    id: row.id,
+    role: row.role,
+    isGlobalAdmin: row.role === "admin" || row.role === "super_admin",
+  };
+}
+
 /** Resolve a trusted application user row inside the caller's transaction. */
 export async function getAppUserById(
   userId: string,
@@ -109,11 +117,26 @@ export async function getAppUserById(
     .where(eq(users.id, userId))
     .limit(1);
   if (!row) return null;
-  return {
-    id: row.id,
-    role: row.role,
-    isGlobalAdmin: row.role === "admin" || row.role === "super_admin",
-  };
+  return toAppUser(row);
+}
+
+/**
+ * Re-resolve and lock an actor inside a sensitive transition transaction.
+ * Plain `users.role` updates take the same row lock, so a demotion either
+ * commits before this read (and is observed) or waits until the transition
+ * has finished.
+ */
+export async function getLockedAppUserById(
+  userId: string,
+  executor: typeof db,
+): Promise<AppUser | null> {
+  const [row] = await executor
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .for("update")
+    .limit(1);
+  return row ? toAppUser(row) : null;
 }
 
 export type AccessError = { ok: false; status: 401 | 403 | 404; error: string };
@@ -167,8 +190,9 @@ async function membershipRole(
   userId: string,
   organizationId: number,
   executor: typeof db = db,
+  lockForUpdate = false,
 ): Promise<OrgRole | null> {
-  const rows = await executor
+  const buildQuery = () => executor
     .select({ role: partnerOrganizationMembers.role })
     .from(partnerOrganizationMembers)
     .innerJoin(
@@ -183,6 +207,9 @@ async function membershipRole(
         inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
       ),
     );
+  const rows = lockForUpdate
+    ? await buildQuery().for("update", { of: partnerOrganizationMembers })
+    : await buildQuery();
   if (rows.length === 0) return null;
   return rows
     .map((r) => r.role as OrgRole)
@@ -217,11 +244,13 @@ export async function authorizeVenueAccess(
   user: AppUser,
   venueId: number,
   minimumRole: OrgRole = "staff",
+  executor: typeof db = db,
+  lockMembership = false,
 ): Promise<VenueAccess | AccessError> {
   if (!Number.isFinite(venueId)) {
     return { ok: false, status: 404, error: "Invalid venue id" };
   }
-  const [venue] = await db
+  const [venue] = await executor
     .select({ id: venues.id, organizationId: venues.organizationId, userId: venues.userId })
     .from(venues)
     .where(eq(venues.id, venueId))
@@ -245,7 +274,31 @@ export async function authorizeVenueAccess(
   // consulted here (ADR 0028, correction #1): a disabled, removed or demoted
   // member must not recover owner access through the old ownership column.
   if (isMultiHallEnabled() && venue.organizationId != null) {
-    const role = await membershipRole(user.id, venue.organizationId);
+    if (lockMembership) {
+      // Sensitive writers already hold the venue row. Lock its organization
+      // next, matching registration snapshot order, so a direct suspension
+      // cannot commit after authorization but before the protected write.
+      const [organization] = await executor
+        .select({ status: partnerOrganizations.status })
+        .from(partnerOrganizations)
+        .where(eq(partnerOrganizations.id, venue.organizationId))
+        .for("update")
+        .limit(1);
+      if (
+        !organization
+        || !ORG_STATUSES_ALLOWING_ACCESS.includes(
+          organization.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+        )
+      ) {
+        return { ok: false, status: 403, error: "Forbidden" };
+      }
+    }
+    const role = await membershipRole(
+      user.id,
+      venue.organizationId,
+      executor,
+      lockMembership,
+    );
     if (role && meetsRole(role, minimumRole)) {
       return {
         ok: true,
@@ -281,8 +334,37 @@ export async function authorizeVenueCapability(
   user: AppUser,
   venueId: number,
   capability: VenueCapability,
+  executor: typeof db = db,
 ): Promise<VenueAccess | AccessError> {
-  return authorizeVenueAccess(user, venueId, VENUE_CAPABILITY_MIN_ROLE[capability]);
+  return authorizeVenueAccess(
+    user,
+    venueId,
+    VENUE_CAPABILITY_MIN_ROLE[capability],
+    executor,
+  );
+}
+
+/**
+ * Re-authorize a venue capability inside a sensitive write transaction.
+ *
+ * The caller must already hold the actor/organization advisory locks and the
+ * venue row lock. The organization row is then locked before the qualifying
+ * membership row, making direct suspension/revoke/demotion either visible
+ * here or wait until this write commits.
+ */
+export async function authorizeVenueCapabilityLocked(
+  user: AppUser,
+  venueId: number,
+  capability: VenueCapability,
+  executor: typeof db,
+): Promise<VenueAccess | AccessError> {
+  return authorizeVenueAccess(
+    user,
+    venueId,
+    VENUE_CAPABILITY_MIN_ROLE[capability],
+    executor,
+    true,
+  );
 }
 
 export async function authorizeOrganizationCapability(
@@ -297,6 +379,49 @@ export async function authorizeOrganizationCapability(
     ORG_CAPABILITY_MIN_ROLE[capability],
     executor,
   );
+}
+
+/**
+ * Transactional organization authorization for state transitions. The caller
+ * must already hold the actor row/advisory locks. Locking the organization row
+ * before the qualifying membership row makes direct suspension, revoke, or
+ * demotion updates either visible here or wait until this write commits.
+ */
+export async function authorizeOrganizationCapabilityLocked(
+  user: AppUser,
+  organizationId: number,
+  capability: OrganizationCapability,
+  executor: typeof db,
+): Promise<OrgAccess | AccessError> {
+  if (!Number.isFinite(organizationId)) {
+    return { ok: false, status: 404, error: "Invalid organization id" };
+  }
+
+  const [organization] = await executor
+    .select({ status: partnerOrganizations.status })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, organizationId))
+    .for("update")
+    .limit(1);
+  if (!organization) {
+    return { ok: false, status: 404, error: "Organization not found" };
+  }
+  if (
+    !ORG_STATUSES_ALLOWING_ACCESS.includes(
+      organization.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+    )
+  ) {
+    return { ok: false, status: 403, error: "Forbidden" };
+  }
+
+  if (user.isGlobalAdmin) {
+    return { ok: true, user, organizationId, role: "owner", viaAdmin: true };
+  }
+  const role = await membershipRole(user.id, organizationId, executor, true);
+  if (!role || !meetsRole(role, ORG_CAPABILITY_MIN_ROLE[capability])) {
+    return { ok: false, status: 403, error: "Forbidden" };
+  }
+  return { ok: true, user, organizationId, role, viaAdmin: false };
 }
 
 /** Pure hall authorization: resolves the hall's venue, then authorizes it. */
@@ -464,8 +589,9 @@ export type VenueNotificationRecipient = { userId: string; email: string | null 
 
 export async function getVenueOwnerRecipients(
   venueId: number,
+  executor: typeof db = db,
 ): Promise<VenueNotificationRecipient[]> {
-  const [venue] = await db
+  const [venue] = await executor
     .select({ organizationId: venues.organizationId, userId: venues.userId })
     .from(venues)
     .where(eq(venues.id, venueId))
@@ -476,7 +602,7 @@ export async function getVenueOwnerRecipients(
   if (isMultiHallEnabled() && venue.organizationId != null) {
     // Membership-only: the legacy owner must NOT be re-added here (CP3 #2),
     // otherwise a removed/demoted ex-owner would keep receiving owner notices.
-    const members = await db
+    const members = await executor
       .select({ userId: partnerOrganizationMembers.userId, email: users.email })
       .from(partnerOrganizationMembers)
       .innerJoin(users, eq(users.id, partnerOrganizationMembers.userId))
@@ -497,7 +623,7 @@ export async function getVenueOwnerRecipients(
   }
   // Flag off, or venue has no organization yet → legacy owner.
   if (venue.userId) {
-    const [legacyOwner] = await db
+    const [legacyOwner] = await executor
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(eq(users.id, venue.userId))

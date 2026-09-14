@@ -24,8 +24,8 @@ import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import {
-  authorizeOrganizationCapability,
-  getAppUserById,
+  authorizeOrganizationCapabilityLocked,
+  getLockedAppUserById,
 } from "@/lib/venue-access";
 
 type Executor = typeof db;
@@ -271,6 +271,14 @@ export async function recordLegalAcceptancePack(input: {
       code: "ORGANIZATION_SUBJECT_REQUIRED",
     };
   }
+  if (input.organizationId && (input.artistId != null || input.venueId != null)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "organization evidence cannot be linked to one profile",
+      code: "ORGANIZATION_PROFILE_LINK_NOT_ALLOWED",
+    };
+  }
   if (input.organizationId && !isMultiHallEnabled()) {
     return { ok: false, status: 404, error: "FEATURE_DISABLED", code: "FEATURE_DISABLED" };
   }
@@ -301,7 +309,7 @@ export async function recordLegalAcceptancePack(input: {
         // The route-level check is only an early rejection. Membership can be
         // revoked while signature validation runs, so the authoritative check
         // happens after the same organization lock used by member mutations.
-        const actor = await getAppUserById(input.userId, executor);
+        const actor = await getLockedAppUserById(input.userId, executor);
         if (!actor) {
           return {
             ok: false as const,
@@ -310,7 +318,7 @@ export async function recordLegalAcceptancePack(input: {
             code: "FORBIDDEN",
           };
         }
-        const access = await authorizeOrganizationCapability(
+        const access = await authorizeOrganizationCapabilityLocked(
           actor,
           input.organizationId,
           "manage_legal",

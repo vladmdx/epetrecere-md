@@ -2,6 +2,7 @@ interface RegistrationStatusProps {
   name: string;
   type: "artist" | "venue";
   approved: boolean;
+  ctaUrl?: string;
 }
 
 export function registrationStatusEmail(props: RegistrationStatusProps): string {
@@ -15,7 +16,7 @@ export function registrationStatusEmail(props: RegistrationStatusProps): string 
     : `Din păcate, profilul <strong>${props.name}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
 
   const ctaUrl = props.approved
-    ? `https://epetrecere.md${props.type === "venue" ? "/dashboard/sala" : "/dashboard"}`
+    ? props.ctaUrl ?? `https://epetrecere.md${props.type === "venue" ? "/dashboard/sala" : "/dashboard"}`
     : "https://epetrecere.md/contact";
   const ctaText = props.approved ? "Deschide Dashboard →" : "Contactează-ne →";
 

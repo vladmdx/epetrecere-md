@@ -18,6 +18,8 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { setMobileRolePreferenceInDatabase } from "@/lib/auth/select-role";
 
 const BodySchema = z.object({
   role: z.enum(["user", "artist"]),
@@ -40,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [appUser] = await db
-    .select({ id: users.id, currentRole: users.role })
+    .select({ id: users.id })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
@@ -48,21 +50,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
 
-  // Don't downgrade an admin/editor to user — only normal users can
-  // pick a role through this endpoint.
-  if (
-    appUser.currentRole === "admin" ||
-    appUser.currentRole === "super_admin" ||
-    appUser.currentRole === "editor"
-  ) {
-    return NextResponse.json({
-      ok: true,
-      role: appUser.currentRole,
-      message: "Role unchanged (admin tier).",
-    });
+  const result = await setMobileRolePreferenceInDatabase({
+    userId: appUser.id,
+    role: body.role,
+    multiHallEnabled: isMultiHallEnabled(),
+  });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error, code: result.code },
+      { status: result.status },
+    );
   }
-
-  await db.update(users).set({ role: body.role }).where(eq(users.id, appUser.id));
-
-  return NextResponse.json({ ok: true, role: body.role });
+  return NextResponse.json(result);
 }
