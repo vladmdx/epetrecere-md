@@ -346,8 +346,8 @@ export const expirePendingBookings = inngest.createFunction(
 );
 
 // Durable confirmation effects. `after()` gives the fast path; this poller
-// recovers a process crash before/after that callback. A second Vercel cron
-// provides the same recovery path when either scheduler is temporarily down.
+// recovers a process crash before/after that callback. A daily Vercel cron is
+// the Hobby-compatible fallback when the primary Inngest scheduler is down.
 export const bookingConfirmationOutbox = inngest.createFunction(
   {
     id: "booking-confirmation-outbox",

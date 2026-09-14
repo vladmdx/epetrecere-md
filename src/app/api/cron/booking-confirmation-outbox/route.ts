@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Redundant durable-outbox runner. Vercel supplies CRON_SECRET as Bearer. */
+/** Daily fallback outbox runner. Inngest is primary; Vercel supplies CRON_SECRET as Bearer. */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {

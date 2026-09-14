@@ -60,9 +60,17 @@ npm run test:multihall:organization-flow
 npm run test:multihall:hall-crud-source
 npm run test:multihall:image-locking-source
 npm run test:multihall:registration-locking-source
+npm run test:multihall:availability-scope-source
+npx tsx --test scripts/venue-schedule-block-ical.test.ts
+npm run test:wishlist:visibility
 npm run test:booking-outbox:policy
 npm run test:legal-pack
 ```
+
+The Vercel project currently uses the Hobby-compatible daily schedule for the
+booking-confirmation outbox fallback. Inngest remains the primary five-minute
+runner; changing the Vercel expression to a sub-daily interval makes Vercel
+reject the deployment before the build starts.
 
 ## Post-migration database regressions
 
