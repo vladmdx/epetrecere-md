@@ -106,7 +106,8 @@ export async function GET() {
       : Promise.resolve([]),
     db
       .select({ id: categories.id, nameRo: categories.nameRo, slug: categories.slug, type: categories.type })
-      .from(categories),
+      .from(categories)
+      .where(eq(categories.isActive, true)),
   ]);
 
   const venueCoverMap = new Map(

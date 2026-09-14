@@ -87,20 +87,85 @@ test("the public gallery never exposes inactive venue images to anonymous caller
     getBody,
     /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*canViewInactive \? undefined : eq\(venues\.isActive, true\)/,
   );
+});
 
+test("wishlist reads and writes enforce public entity and category visibility", () => {
+  const getStart = wishlistRoute.indexOf("export async function GET");
+  const getEnd = wishlistRoute.indexOf("// ─── POST", getStart);
+  assert.ok(getStart >= 0 && getEnd > getStart);
+  const wishlistGet = wishlistRoute.slice(getStart, getEnd);
+
+  const artistReadStart = wishlistGet.indexOf("artistIds.length");
+  const venueReadStart = wishlistGet.indexOf("venueIds.length", artistReadStart);
+  const coverReadStart = wishlistGet.indexOf("venueIds.length", venueReadStart + 1);
+  const categoryReadStart = wishlistGet.indexOf(
+    ".select({ id: categories.id",
+    coverReadStart,
+  );
+  const batchEnd = wishlistGet.indexOf("]);", categoryReadStart);
+  assert.ok(
+    artistReadStart >= 0 &&
+      venueReadStart > artistReadStart &&
+      coverReadStart > venueReadStart &&
+      categoryReadStart > coverReadStart &&
+      batchEnd > categoryReadStart,
+    "wishlist GET batch queries must remain independently identifiable",
+  );
+
+  const artistRead = wishlistGet.slice(artistReadStart, venueReadStart);
+  const venueRead = wishlistGet.slice(venueReadStart, coverReadStart);
+  const coverRead = wishlistGet.slice(coverReadStart, categoryReadStart);
+  const categoryRead = wishlistGet.slice(categoryReadStart, batchEnd);
   assert.match(
-    wishlistRoute,
+    artistRead,
+    /\.from\(artists\)[\s\S]*inArray\(artists\.id, artistIds\)[\s\S]*eq\(artists\.isActive, true\)/,
+  );
+  assert.match(
+    venueRead,
     /\.from\(venues\)[\s\S]*inArray\(venues\.id, venueIds\)[\s\S]*eq\(venues\.isActive, true\)/,
   );
   assert.match(
-    wishlistRoute,
+    coverRead,
     /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*eq\(venues\.isActive, true\)/,
   );
+  assert.match(categoryRead, /\.from\(categories\)/);
+  assert.match(
+    categoryRead,
+    /\.where\(eq\(categories\.isActive, true\)\)/,
+  );
+
   const postStart = wishlistRoute.indexOf("export async function POST");
   const postEnd = wishlistRoute.indexOf("// ─── DELETE", postStart);
+  assert.ok(postStart >= 0 && postEnd > postStart);
   const postBody = wishlistRoute.slice(postStart, postEnd);
-  assert.match(postBody, /eq\(artists\.isActive, true\)/);
-  assert.match(postBody, /eq\(venues\.isActive, true\)/);
+  const artistBranchStart = postBody.indexOf(
+    'if (parsed.data.entityType === "artist")',
+  );
+  const venueBranchStart = postBody.indexOf("} else {", artistBranchStart);
+  const insertStart = postBody.indexOf(
+    "// onConflictDoNothing",
+    venueBranchStart,
+  );
+  assert.ok(
+    artistBranchStart >= 0 &&
+      venueBranchStart > artistBranchStart &&
+      insertStart > venueBranchStart,
+    "wishlist POST entity branches must remain independently identifiable",
+  );
+  const artistBranch = postBody.slice(artistBranchStart, venueBranchStart);
+  const venueBranch = postBody.slice(venueBranchStart, insertStart);
+  assert.match(
+    artistBranch,
+    /\.from\(artists\)[\s\S]*eq\(artists\.id, parsed\.data\.entityId\)[\s\S]*eq\(artists\.isActive, true\)/,
+  );
+  assert.match(
+    venueBranch,
+    /\.from\(venues\)[\s\S]*eq\(venues\.id, parsed\.data\.entityId\)[\s\S]*eq\(venues\.isActive, true\)/,
+  );
+  assert.match(
+    wishlistRoute,
+    /entityType:\s*z\.enum\(\["artist", "venue"\]\)/,
+  );
 });
 
 test("transactional authority follows the shared lock order", () => {
