@@ -70,7 +70,6 @@ export async function POST(req: NextRequest) {
       clientUserId: bookingRequests.clientUserId,
       eventDate: bookingRequests.eventDate,
       status: bookingRequests.status,
-      venueOwner: venues.userId,
       venueName: venues.nameRo,
       venueSlug: venues.slug,
       artistOwner: artists.userId,

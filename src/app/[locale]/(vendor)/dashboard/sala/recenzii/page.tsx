@@ -14,6 +14,7 @@ import {
   venues,
   reviews,
   bookingRequests,
+  venueHalls,
 } from "@/lib/db/schema";
 import { VenueReviewsClient } from "./client";
 
@@ -55,8 +56,10 @@ export default async function VenueReviewsPage() {
         replyAt: reviews.replyAt,
         isApproved: reviews.isApproved,
         createdAt: reviews.createdAt,
+        hallName: venueHalls.nameRo,
       })
       .from(reviews)
+      .leftJoin(venueHalls, eq(venueHalls.id, reviews.hallId))
       .where(eq(reviews.venueId, venue.id))
       .orderBy(desc(reviews.createdAt)),
 
@@ -70,9 +73,11 @@ export default async function VenueReviewsPage() {
         eventType: bookingRequests.eventType,
         status: bookingRequests.status,
         reviewId: reviews.id,
+        hallName: venueHalls.nameRo,
       })
       .from(bookingRequests)
       .leftJoin(reviews, eq(reviews.bookingRequestId, bookingRequests.id))
+      .leftJoin(venueHalls, eq(venueHalls.id, bookingRequests.hallId))
       .where(
         and(
           eq(bookingRequests.venueId, venue.id),
@@ -111,6 +116,7 @@ export default async function VenueReviewsPage() {
         eventDate: b.eventDate,
         eventType: b.eventType,
         status: b.status,
+        hallName: b.hallName,
       }))}
     />
   );

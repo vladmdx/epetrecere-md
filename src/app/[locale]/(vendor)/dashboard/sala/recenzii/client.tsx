@@ -53,6 +53,7 @@ interface Review {
   replyAt: string | null;
   isApproved: boolean;
   createdAt: string;
+  hallName?: string | null;
 }
 
 interface ReviewableBooking {
@@ -62,6 +63,7 @@ interface ReviewableBooking {
   eventDate: string;
   eventType: string | null;
   status: string;
+  hallName?: string | null;
 }
 
 interface Props {
@@ -183,7 +185,7 @@ export function VenueReviewsClient({
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter((r) => {
-        const hay = [r.authorName, r.text, r.eventType, r.reply]
+        const hay = [r.authorName, r.text, r.eventType, r.reply, r.hallName]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -443,6 +445,7 @@ export function VenueReviewsClient({
                       <p className="font-medium">{b.clientName}</p>
                       <p className="text-xs text-muted-foreground">
                         {b.eventType || t("vendor.venueReviews.eventFallback")}{" "}
+                        {b.hallName ? `· ${b.hallName} ` : ""}
                         ·{" "}
                         {new Date(b.eventDate).toLocaleDateString(intlTag, {
                           day: "numeric",
@@ -594,7 +597,8 @@ export function VenueReviewsClient({
                       <span className="font-medium">{review.authorName}</span>
                       <span className="text-xs text-muted-foreground">
                         {review.eventType ||
-                          t("vendor.venueReviews.eventFallback")}{" "}
+                          t("vendor.venueReviews.eventFallback")}
+                        {review.hallName ? ` · ${review.hallName}` : ""}{" "}
                         ·{" "}
                         {new Date(review.createdAt).toLocaleDateString(intlTag)}
                       </span>
