@@ -82,15 +82,15 @@ test("vendor CTA uses locatii venueId when multi-hall is on, sala only when off"
 test("notificationContext accepts canonical locatii mesaje with or without locale", () => {
   assert.deepEqual(
     notificationContext("/dashboard/locatii/88/mesaje?conversation=9"),
-    { kind: "conversation", id: 9 },
+    { kind: "conversation", id: 9, venueId: 88 },
   );
   assert.deepEqual(
     notificationContext("https://epetrecere.md/ru/dashboard/locatii/88/mesaje?conversation=9"),
-    { kind: "conversation", id: 9 },
+    { kind: "conversation", id: 9, venueId: 88 },
   );
   assert.deepEqual(
     notificationContext("/en/dashboard/locatii/88/mesaje?conversation=9"),
-    { kind: "conversation", id: 9 },
+    { kind: "conversation", id: 9, venueId: 88 },
   );
 });
 

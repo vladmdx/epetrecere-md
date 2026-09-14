@@ -34,10 +34,16 @@ test("unrelated, ambiguous, already-correct and external links are not rewritten
 });
 
 test("new counteroffer notifications and email CTAs use the correct vendor destination", () => {
-  assert.equal(vendorBookingNotificationPath(45), "/dashboard/sala/rezervari");
-  assert.equal(vendorBookingNotificationPath(null), "/dashboard/rezervari");
+  assert.equal(
+    vendorBookingNotificationPath({ venueId: 45, bookingId: 256 }),
+    "/dashboard/sala/rezervari",
+  );
+  assert.equal(
+    vendorBookingNotificationPath({ venueId: null, bookingId: 256 }),
+    "/dashboard/rezervari",
+  );
   const source = readFileSync("src/app/api/booking-requests/[id]/route.ts", "utf8");
-  assert.match(source, /vendorDashboardPath = vendorBookingNotificationPath\(booking\.venueId\)/);
+  assert.match(source, /vendorDashboardPath = vendorBookingNotificationPath\(\{\s*venueId: booking\.venueId,\s*bookingId: booking\.id,\s*\}\)/);
   assert.match(source, /actionUrl: vendorDashboardPath/);
   assert.match(source, /ctaUrl: `https:\/\/epetrecere\.md\$\{vendorDashboardPath\}`/);
 });
