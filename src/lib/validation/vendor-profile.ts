@@ -21,7 +21,13 @@ export const registrationDecisionSchema = z.object({
   id: z.number().int().positive(),
   type: z.enum(["artist", "venue"]),
   action: z.enum(["approve", "reject"]),
-});
+  hallIds: z.array(z.number().int().positive()).min(1).max(20)
+    .refine((ids) => new Set(ids).size === ids.length).optional(),
+  reviewReason: z.string().trim().min(10).max(1000).optional(),
+}).strict().refine((decision) =>
+  (decision.type === "venue" || (decision.hallIds == null && decision.reviewReason == null)) &&
+  (decision.action === "reject" || decision.reviewReason == null),
+);
 
 /** These remain admin-owned even when a profile editor submits a full row. */
 export function venueOwnerFields<T extends { isActive?: boolean; isFeatured?: boolean }>(data: T, admin: boolean) {

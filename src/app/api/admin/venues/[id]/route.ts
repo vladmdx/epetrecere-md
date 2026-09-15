@@ -101,6 +101,7 @@ export async function GET(
       nameEn: venueHalls.nameEn,
       slug: venueHalls.slug,
       status: venueHalls.status,
+      reviewReason: venueHalls.reviewReason,
       isLegacyDefault: venueHalls.isLegacyDefault,
       capacityMin: venueHalls.capacityMin,
       capacityMax: venueHalls.capacityMax,

@@ -213,12 +213,12 @@ before(async () => {
   if (!v1.ok) throw new Error("v1");
   ids.venue = v1.venue.id;
   const h1 = await createHallDraft(ids.owner, {
-    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Grand", capacityMin: 20, capacityMax: 80, imageUrls: [],
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Grand", capacityMin: 20, capacityMax: 80, imageUrls: ["https://example.com/grand.jpg"],
   });
   assert.equal(h1.ok, true);
   if (h1.ok) ids.hallA = h1.hall.id;
   const h2 = await createHallDraft(ids.owner, {
-    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Garden", capacityMin: 10, capacityMax: 40, imageUrls: [],
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "Garden", capacityMin: 10, capacityMax: 40, imageUrls: ["https://example.com/garden.jpg"],
   });
   assert.equal(h2.ok, true);
   if (h2.ok) ids.hallB = h2.hall.id;
@@ -309,7 +309,7 @@ test("fresh POST legal fields persist; add venue does not mutate the first local
 
 test("approval: extra hall pending keeps venue searchable; reject extra hall keeps venue active", async () => {
   const extra = await createHallDraft(ids.owner, {
-    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "VIP pending", capacityMin: 8, capacityMax: 16, imageUrls: [],
+    venueId: ids.venue, hallCreateRequestId: randomUUID(), nameRo: "VIP pending", capacityMin: 8, capacityMax: 16, imageUrls: ["https://example.com/vip.jpg"],
   });
   assert.equal(extra.ok, true);
   if (!extra.ok) throw new Error("extra hall");

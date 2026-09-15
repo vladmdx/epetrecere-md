@@ -3,22 +3,40 @@ interface RegistrationStatusProps {
   type: "artist" | "venue";
   approved: boolean;
   ctaUrl?: string;
+  hallDecision?: boolean;
+  remainingPendingHallCount?: number;
+  rejectionReason?: string;
 }
 
 export function registrationStatusEmail(props: RegistrationStatusProps): string {
-  const typeLabel = props.type === "artist" ? "artistul" : "sala";
+  const typeLabel = props.type === "artist" ? "artistul" : "localul";
   const emoji = props.approved ? "🎉" : "😔";
   const statusColor = props.approved ? "#22c55e" : "#ef4444";
   const statusText = props.approved ? "APROBAT" : "REFUZAT";
 
-  const message = props.approved
-    ? `Felicitări! Profilul <strong>${props.name}</strong> a fost verificat și aprobat de echipa noastră. Acum ${typeLabel} tău este vizibil pe platforma ePetrecere.md și poți primi cereri de ofertă.`
-    : `Din păcate, profilul <strong>${props.name}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
+  const safeName = props.name.replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char] ?? char);
+  const pendingNote = props.remainingPendingHallCount
+    ? ` Alte ${props.remainingPendingHallCount} săli rămân în verificare.`
+    : "";
+  const reasonNote = props.rejectionReason
+    ? ` Motivul refuzului: ${props.rejectionReason.replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      })[char] ?? char)}`
+    : "";
+  const message = props.hallDecision
+    ? props.approved
+      ? `Sălile selectate din localul <strong>${safeName}</strong> au fost aprobate și sunt vizibile pe ePetrecere.md.${pendingNote}`
+      : `Sălile selectate din localul <strong>${safeName}</strong> nu au fost aprobate.${reasonNote} Le poți corecta și retrimite; localul și sălile deja aprobate rămân active.${pendingNote}`
+    : props.approved
+      ? `Felicitări! Profilul <strong>${safeName}</strong> a fost verificat și aprobat de echipa noastră. Acum ${typeLabel} tău este vizibil pe platforma ePetrecere.md și poți primi cereri de ofertă.`
+      : `Din păcate, profilul <strong>${safeName}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
 
   const ctaUrl = props.approved
     ? props.ctaUrl ?? `https://epetrecere.md${props.type === "venue" ? "/dashboard/sala" : "/dashboard"}`
-    : "https://epetrecere.md/contact";
-  const ctaText = props.approved ? "Deschide Dashboard →" : "Contactează-ne →";
+    : props.ctaUrl ?? "https://epetrecere.md/contact";
+  const ctaText = props.approved || props.hallDecision ? "Deschide Dashboard →" : "Contactează-ne →";
 
   return `
 <!DOCTYPE html>

@@ -48,6 +48,7 @@ import {
   venueRegistrationSnapshotMatches,
 } from "./registration-state";
 import { writeUserPhoneLocked } from "@/lib/auth/user-phone";
+import { hallReviewIssues } from "./hall-review";
 
 export type OnboardingStep =
   | "organization"
@@ -1098,18 +1099,21 @@ export async function replaceVenueImages(
   }
 }
 
-export async function collectSubmitMissing(
+type HallReviewMode = "submit" | "approve";
+
+export async function collectVenueReviewReadiness(
   venueId: number,
   executor: typeof db = db,
-): Promise<MissingField[]> {
+  options: { mode?: HallReviewMode; selectedHallIds?: readonly number[] } = {},
+): Promise<{ missing: MissingField[]; readyHallIds: number[]; skippedHallIds: number[] }> {
   const missing: MissingField[] = [];
   const [venue] = await executor.select().from(venues).where(eq(venues.id, venueId)).limit(1);
   if (!venue) {
-    return [{ step: "venue", field: "venue", message: "venue_required", path: "venue" }];
+    return { missing: [{ step: "venue", field: "venue", message: "venue_required", path: "venue" }], readyHallIds: [], skippedHallIds: [] };
   }
   if (!venue.organizationId) {
     missing.push({ step: "organization", field: "organizationId", message: "organization_required", path: "organizationId" });
-    return missing;
+    return { missing, readyHallIds: [], skippedHallIds: [] };
   }
   const [org] = await executor
     .select()
@@ -1118,7 +1122,7 @@ export async function collectSubmitMissing(
     .limit(1);
   if (!org) {
     missing.push({ step: "organization", field: "organization", message: "organization_required", path: "organization" });
-    return missing;
+    return { missing, readyHallIds: [], skippedHallIds: [] };
   }
   if (!org.displayName || org.displayName.trim().length < 2) {
     missing.push({ step: "organization", field: "displayName", message: "display_name_required", path: "displayName" });
@@ -1159,19 +1163,63 @@ export async function collectSubmitMissing(
   if (liveHalls.length === 0) {
     missing.push({ step: "hall", field: "halls", message: "at_least_one_hall", path: "halls" });
   }
-  liveHalls.forEach((hall, index) => {
-    if (!hall.nameRo) {
-      missing.push({ step: "hall", field: `halls.${index}.nameRo`, message: "hall_name_required", path: `halls.${index}.nameRo` });
-    }
-    if (hall.capacityMin == null || hall.capacityMax == null || hall.capacityMax < hall.capacityMin) {
-      missing.push({ step: "hall", field: `halls.${index}.capacityMax`, message: "capacity_required", path: `halls.${index}.capacityMax` });
-    }
-    const hasTranslation = Boolean(hall.nameRu || hall.descriptionRu) && Boolean(hall.nameEn || hall.descriptionEn);
-    if (!hasTranslation && !hall.nameRo) {
-      missing.push({ step: "hall", field: `halls.${index}.nameRo`, message: "translations_or_ro_fallback", path: `halls.${index}.nameRo` });
+  const mode = options.mode ?? "submit";
+  const candidates = liveHalls.filter((hall) =>
+    mode === "approve" ? hall.status === "pending" :
+      hall.status === "draft" || hall.status === "rejected",
+  );
+  const requested = options.selectedHallIds == null ? null : new Set(options.selectedHallIds);
+  const selected = requested == null ? candidates : candidates.filter((hall) => requested.has(hall.id));
+  const alreadyReviewedCount = mode === "submit" && requested != null
+    ? liveHalls.filter((hall) => requested.has(hall.id) &&
+        (hall.status === "pending" || hall.status === "active")).length
+    : 0;
+  if (requested != null &&
+    (requested.size !== options.selectedHallIds?.length ||
+      selected.length + alreadyReviewedCount !== requested.size)) {
+    missing.push({ step: "hall", field: "halls", message: "hall_selection_invalid", path: "halls" });
+  }
+  const photoCount = new Map<number, number>();
+  for (const image of images) {
+    if (image.hallId != null) photoCount.set(image.hallId, (photoCount.get(image.hallId) ?? 0) + 1);
+  }
+  const readyHallIds: number[] = [];
+  const skippedHallIds: number[] = [];
+  const candidateMissing: MissingField[] = [];
+  const alreadySubmitted = liveHalls.some((hall) =>
+    hall.status === "pending" || hall.status === "active");
+  selected.forEach((hall) => {
+    const index = liveHalls.findIndex((row) => row.id === hall.id);
+    const issues = hallReviewIssues({ ...hall, photoCount: photoCount.get(hall.id) ?? 0 });
+    if (issues.length) skippedHallIds.push(hall.id);
+    else readyHallIds.push(hall.id);
+    for (const issue of issues) {
+      candidateMissing.push({
+        step: "hall", field: `halls.${index}.${issue}`, path: `halls.${index}.${issue}`,
+        message: issue === "nameRo" ? "hall_name_required" : issue === "capacityMax" ?
+          "capacity_required" : issue === "imageUrls" ? "hall_images_required" : "hall_slug_required",
+      });
     }
   });
-  return missing;
+  // A targeted operation must never silently skip its hall. A whole-local
+  // submit, however, may advance the ready halls while incomplete draft halls
+  // remain editable and private.
+  if (requested != null || mode === "approve" ||
+    (readyHallIds.length === 0 && !alreadySubmitted)) {
+    missing.push(...candidateMissing);
+  }
+  if (readyHallIds.length === 0 && alreadyReviewedCount === 0 &&
+    (mode === "approve" || !alreadySubmitted)) {
+    missing.push({ step: "hall", field: "halls", message: "at_least_one_submittable_hall", path: "halls" });
+  }
+  return { missing, readyHallIds, skippedHallIds };
+}
+
+export async function collectSubmitMissing(
+  venueId: number,
+  executor: typeof db = db,
+): Promise<MissingField[]> {
+  return (await collectVenueReviewReadiness(venueId, executor)).missing;
 }
 
 /**
@@ -1190,7 +1238,11 @@ function registrationSubmissionKey(snapshot: VenueRegistrationSnapshot): string 
   return createHash("sha256").update(stablePreTransitionState).digest("hex").slice(0, 24);
 }
 
-export async function submitVenueForApproval(actorUserId: string, venueId: number) {
+export async function submitVenueForApproval(
+  actorUserId: string,
+  venueId: number,
+  selectedHallIds?: readonly number[],
+) {
   const expected = await captureVenueRegistrationSnapshot(venueId);
   if (!expected) {
     return {
@@ -1298,16 +1350,15 @@ export async function submitVenueForApproval(actorUserId: string, venueId: numbe
       };
     }
 
-    const transitioningHallIds = current.halls
-      .filter((hall) => hall.status === "draft" || hall.status === "rejected")
-      .map((hall) => hall.id);
     const completionUserIds = [
       actorUserId,
       ...(current.venue.userId && current.venue.userId !== actorUserId
         ? [current.venue.userId]
         : []),
     ];
-    const missing = await collectSubmitMissing(venueId, executor);
+    const readiness = await collectVenueReviewReadiness(venueId, executor, { selectedHallIds });
+    const { missing, skippedHallIds } = readiness;
+    const transitioningHallIds = readiness.readyHallIds;
     if (missing.length) {
       return {
         ok: false as const,
@@ -1344,6 +1395,8 @@ export async function submitVenueForApproval(actorUserId: string, venueId: numbe
         organizationId: current.venue.organizationId,
         submitted: false as const,
         submissionKey,
+        submittedHallIds: [] as number[],
+        skippedHallIds,
       };
     }
     await executor
@@ -1357,7 +1410,7 @@ export async function submitVenueForApproval(actorUserId: string, venueId: numbe
       .update(venueHalls)
       // Preserve the edit revision used by registrationSubmissionKey. Only a
       // content edit or rejection starts a new submission generation.
-      .set({ status: "pending" })
+      .set({ status: "pending", reviewReason: null })
       .where(and(
         eq(venueHalls.venueId, venueId),
         inArray(venueHalls.id, transitioningHallIds),
@@ -1398,6 +1451,8 @@ export async function submitVenueForApproval(actorUserId: string, venueId: numbe
       organizationId: current.venue.organizationId,
       submitted: true as const,
       submissionKey,
+      submittedHallIds: transitioningHallIds,
+      skippedHallIds,
     };
   });
 }

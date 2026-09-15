@@ -37,6 +37,7 @@ interface RegistrationRequest {
   photoUrl: string | null;
   createdAt: string;
   userId: string | null;
+  organizationId?: number | null;
   userName: string | null;
   userEmail: string | null;
   baseCity?: string | null;
@@ -63,6 +64,7 @@ interface RegistrationRequest {
     minimumOrder: number | null;
     currency: string;
     photoCount: number;
+    reviewIssues?: string[];
   }[];
   summaries?: {
     hallCount: number;
@@ -70,6 +72,17 @@ interface RegistrationRequest {
     unpublishableCount: number;
     allUnpublishable: boolean;
   };
+}
+
+function reviewIssueText(issue: string, locale: string): string {
+  const labels: Record<string, [string, string, string]> = {
+    nameRo: ["nume", "название", "name"],
+    slug: ["adresă publică", "публичный адрес", "public URL"],
+    capacityMax: ["capacitate", "вместимость", "capacity"],
+    imageUrls: ["fotografie proprie", "фото зала", "hall photo"],
+  };
+  const translated = labels[issue];
+  return translated ? translated[locale === "ru" ? 1 : locale === "en" ? 2 : 0] : issue;
 }
 
 export default function RegistrationRequestsPage() {
@@ -82,6 +95,8 @@ export default function RegistrationRequestsPage() {
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [selectedHallIds, setSelectedHallIds] = useState<Record<number, number[]>>({});
+  const [rejectionReasons, setRejectionReasons] = useState<Record<number, string>>({});
   const [filter, setFilter] = useState<"all" | "artist" | "venue">("all");
 
   async function loadRequests() {
@@ -90,6 +105,8 @@ export default function RegistrationRequestsPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setRequests(data);
+      setSelectedHallIds({});
+      setRejectionReasons({});
     } catch {
       toast.error(t("adminUi.registrations.toastLoadError"));
     } finally {
@@ -101,20 +118,49 @@ export default function RegistrationRequestsPage() {
     loadRequests();
   }, []);
 
-  async function handleAction(id: number, type: "artist" | "venue", action: "approve" | "reject") {
+  function toggleHall(venueId: number, hallId: number) {
+    setSelectedHallIds((current) => {
+      const selected = current[venueId] ?? [];
+      return {
+        ...current,
+        [venueId]: selected.includes(hallId)
+          ? selected.filter((id) => id !== hallId)
+          : [...selected, hallId],
+      };
+    });
+  }
+
+  async function handleAction(req: RegistrationRequest, action: "approve" | "reject") {
+    const { id, type } = req;
+    const hallIds = type === "venue" && req.organizationId != null
+      ? selectedHallIds[id] ?? []
+      : undefined;
+    if (hallIds && hallIds.length === 0) {
+      toast.error(locale === "ru" ? "Выберите хотя бы один зал" : locale === "en" ? "Select at least one hall" : "Selectează cel puțin o sală");
+      return;
+    }
+    const reviewReason = action === "reject" && req.organizationId != null
+      ? rejectionReasons[id]?.trim() ?? ""
+      : undefined;
+    if (reviewReason != null && reviewReason.length < 10) {
+      toast.error(locale === "ru" ? "Укажите причину отказа (не менее 10 символов)" : locale === "en" ? "Add a rejection reason (at least 10 characters)" : "Scrie motivul refuzului (minimum 10 caractere)");
+      return;
+    }
     setProcessing(`${type}-${id}`);
     try {
       const res = await fetch("/api/admin/registration-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, type, action }),
+        body: JSON.stringify({ id, type, action, ...(hallIds ? { hallIds } : {}), ...(reviewReason ? { reviewReason } : {}) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t("adminUi.registrations.genericError"));
+        throw new Error(err.missing?.length
+          ? `${err.error || "Date incomplete"}: ${err.missing.join(", ")}`
+          : err.error || t("adminUi.registrations.genericError"));
       }
       toast.success(action === "approve" ? t("adminUi.registrations.toastApproved") : t("adminUi.registrations.toastRejected"));
-      setRequests((prev) => prev.filter((r) => !(r.id === id && r.type === type)));
+      await loadRequests();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("adminUi.registrations.toastProcessError"));
     } finally {
@@ -295,6 +341,16 @@ export default function RegistrationRequestsPage() {
                               <ul className="mt-1 space-y-1">
                                 {req.halls.map((hall) => (
                                   <li key={hall.id} className="text-xs text-muted-foreground">
+                                    {hall.status === "pending" && req.organizationId != null ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={(selectedHallIds[req.id] ?? []).includes(hall.id)}
+                                        onChange={() => toggleHall(req.id, hall.id)}
+                                        disabled={processing === `${req.type}-${req.id}`}
+                                        aria-label={`${locale === "ru" ? "Выбрать" : locale === "en" ? "Select" : "Selectează"} ${hall.nameRo}`}
+                                        className="mr-2 align-middle accent-gold"
+                                      />
+                                    ) : null}
                                     <span className="text-foreground">{hall.nameRo}</span>
                                     {" · "}
                                     {t("adminUi.registrations.hallStatus")}: {adminVenueStatusText(hall.status, t)}
@@ -304,11 +360,29 @@ export default function RegistrationRequestsPage() {
                                       ? ` · ${hall.capacityMin ?? "—"}–${hall.capacityMax ?? "—"}`
                                       : ""}
                                     {` · ${adminHallPriceText(hall, t)}`}
+                                    {hall.reviewIssues?.length ? (
+                                      <span className="ml-1 text-amber-500">
+                                        · {locale === "ru" ? "Не готов" : locale === "en" ? "Incomplete" : "Incomplet"}: {hall.reviewIssues.map((issue) => reviewIssueText(issue, locale)).join(", ")}
+                                      </span>
+                                    ) : null}
                                   </li>
                                 ))}
                               </ul>
                             ) : null}
                           </div>
+                          {req.organizationId != null ? (
+                            <label className="block space-y-1 text-xs text-muted-foreground">
+                              <span>{locale === "ru" ? "Причина отказа (обязательно при отказе)" : locale === "en" ? "Rejection reason (required to reject)" : "Motivul refuzului (obligatoriu la refuz)"}</span>
+                              <textarea
+                                value={rejectionReasons[req.id] ?? ""}
+                                onChange={(event) => setRejectionReasons((current) => ({ ...current, [req.id]: event.target.value }))}
+                                maxLength={1000}
+                                rows={2}
+                                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+                                placeholder={locale === "ru" ? "Что нужно исправить в выбранных залах?" : locale === "en" ? "What should be corrected in the selected halls?" : "Ce trebuie corectat la sălile selectate?"}
+                              />
+                            </label>
+                          ) : null}
                         </div>
                       )}
                       {req.type === "artist" && req.baseCity && (
@@ -338,7 +412,7 @@ export default function RegistrationRequestsPage() {
                   <div className="flex shrink-0 gap-2 sm:flex-col">
                     <Button
                       size="sm"
-                      onClick={() => handleAction(req.id, req.type, "approve")}
+                      onClick={() => handleAction(req, "approve")}
                       disabled={processing === `${req.type}-${req.id}` || !req.contracts?.length}
                       className="gap-1.5 bg-green-600 hover:bg-green-700"
                     >
@@ -352,7 +426,7 @@ export default function RegistrationRequestsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleAction(req.id, req.type, "reject")}
+                      onClick={() => handleAction(req, "reject")}
                       disabled={processing === `${req.type}-${req.id}`}
                       className="gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10"
                     >

@@ -337,6 +337,22 @@ RLS/policy/direct+inherited ACL drift, then reapplies and compares the complete
 hardened catalog. It also proves incompatible column, extra constraint/index,
 and foreign same-name-index probes are rejected transactionally.
 
+## Pending rollout: `0040_hall_review_reason.sql`
+
+Phase 6A.3 adds a private rejection reason to each Hall. Its only DDL is the
+reviewed manual `0040` file; the same change is not duplicated in
+`supabase/migrations`. Apply it only after `0028`–`0039` are present, first to
+a disposable guarded loopback database and then to Preview/staging under an
+explicit rollout decision. Deploy the matching code only after `0040` passes.
+This branch has not applied `0040` to any database. Source-only verification:
+
+```bash
+npm run test:phase6a3:source
+```
+
+The DB regression in `scripts/venue-multihall-approval-regression.test.ts`
+must additionally pass on the post-`0040` disposable database before a rollout.
+
 ## 🔴 Pending on prod: `push_tokens`
 
 The mobile app's push tokens table (`push_tokens`) exists in `schema.ts` but

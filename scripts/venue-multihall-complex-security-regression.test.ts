@@ -375,6 +375,11 @@ async function createCompleteVenue(
       capacityMax: 50,
     })
     .returning({ id: venueHalls.id });
+  await db.insert(venueImages).values({
+    venueId: venue.id,
+    hallId: target.id,
+    url: `https://example.com/${MARK}_${suffix}_target.jpg`,
+  });
   const [sibling] = await db
     .insert(venueHalls)
     .values({

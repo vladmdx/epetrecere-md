@@ -269,7 +269,7 @@ test("submit validates before no-op and blocks terminal organization states", ()
 
   assert.match(submitBody, /code: "ORGANIZATION_NOT_SUBMITTABLE"/);
   assert.ok(
-    submitBody.indexOf("collectSubmitMissing(venueId, executor)") <
+    submitBody.indexOf("collectVenueReviewReadiness(venueId, executor") <
       submitBody.indexOf("transitioningHallIds.length === 0"),
   );
   assert.match(submitBody, /hall\.status === "pending"/);
@@ -314,8 +314,8 @@ test("admin registration cache purge covers before-active and after-active state
   const venueStart = route.indexOf('} else if (type === "venue")');
   const venueBody = route.slice(venueStart);
   const decisionEnd = Math.max(
-    venueBody.indexOf("approvePartnerVenue(admin.id, id)"),
-    venueBody.indexOf("rejectPartnerVenue(admin.id, id)"),
+    venueBody.indexOf("approvePartnerVenue(admin.id, id, hallIds)"),
+    venueBody.indexOf("rejectPartnerVenue(admin.id, id, hallIds, reviewReason)"),
   );
   assert.ok(decisionEnd >= 0);
   assert.ok(venueBody.indexOf('revalidateVendorCatalog("venue"') > decisionEnd);

@@ -20,7 +20,7 @@ import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { jsonIfOrganizationBackedVenueDisabled } from "./multi-hall-gate";
 import { getLockedAppUserById, getVenueOwnerRecipients } from "@/lib/venue-access";
-import { collectSubmitMissing } from "./onboarding";
+import { collectVenueReviewReadiness } from "./onboarding";
 import { organizationHasValidContract } from "./legal";
 import { validatePhone } from "@/lib/phone/validate";
 import {
@@ -385,8 +385,12 @@ async function collectLegacyApprovalMissing(
   return missing;
 }
 
-export async function approvePartnerVenue(adminUserId: string, venueId: number): Promise<
-  | { ok: true; venue: typeof venues.$inferSelect; emails: Array<{ userId: string; email: string | null }> }
+export async function approvePartnerVenue(
+  adminUserId: string,
+  venueId: number,
+  selectedHallIds?: readonly number[],
+): Promise<
+  | { ok: true; venue: typeof venues.$inferSelect; emails: Array<{ userId: string; email: string | null }>; reviewedHallIds: number[]; remainingPendingHallCount: number; venueBecameActive: boolean }
   | { ok: false; error: string; status: number; missing?: string[]; code?: string }
 > {
   const expected = await captureVenueRegistrationSnapshot(venueId);
@@ -464,6 +468,22 @@ export async function approvePartnerVenue(adminUserId: string, venueId: number):
         result: { ok: false as const, error: "booking_changed", status: 409, code: "NOT_PENDING" },
       };
     }
+    const pendingHallIds = current.halls
+      .filter((hall) => hall.status === "pending" &&
+        (current.venue.organizationId != null || hall.isLegacyDefault))
+      .map((hall) => hall.id);
+    const reviewedHallIds = selectedHallIds == null ? pendingHallIds : [...selectedHallIds];
+    if (
+      reviewedHallIds.length === 0 ||
+      new Set(reviewedHallIds).size !== reviewedHallIds.length ||
+      reviewedHallIds.some((id) => !pendingHallIds.includes(id)) ||
+      (current.venue.organizationId == null && selectedHallIds != null)
+    ) {
+      return {
+        kind: "error" as const,
+        result: { ok: false as const, error: "hall_selection_invalid", status: 409, code: "HALL_SELECTION_INVALID" },
+      };
+    }
     if (
       current.venue.organizationId != null &&
       (!current.organization || !isReconciliableOrganizationStatus(current.organization.status))
@@ -481,7 +501,9 @@ export async function approvePartnerVenue(adminUserId: string, venueId: number):
 
     const missing = current.venue.organizationId == null
       ? await collectLegacyApprovalMissing(venueId, executor)
-      : (await collectSubmitMissing(venueId, executor)).map((item) => item.path);
+      : (await collectVenueReviewReadiness(venueId, executor, {
+          mode: "approve", selectedHallIds: reviewedHallIds,
+        })).missing.map((item) => item.path);
     if (missing.length) {
       return {
         kind: "error" as const,
@@ -535,10 +557,11 @@ export async function approvePartnerVenue(adminUserId: string, venueId: number):
       .update(venueHalls)
       // Keep the submission-generation revision stable across approval. A
       // later rejection or content edit advances venueHalls.updatedAt.
-      .set({ status: "active" })
+      .set({ status: "active", reviewReason: null })
       .where(and(
         eq(venueHalls.venueId, venueId),
         eq(venueHalls.status, "pending"),
+        inArray(venueHalls.id, reviewedHallIds),
         current.venue.organizationId == null
           ? eq(venueHalls.isLegacyDefault, true)
           : undefined,
@@ -590,14 +613,19 @@ export async function approvePartnerVenue(adminUserId: string, venueId: number):
         result: { ok: false as const, error: "Venue not found", status: 404 },
       };
     }
+    const remainingPendingHallCount = current.halls.filter((hall) =>
+      hall.status === "pending" && !reviewedHallIds.includes(hall.id)).length;
+    const venueBecameActive = !current.venue.isActive && row.isActive;
     const recipients = await getVenueOwnerRecipients(venueId, executor);
     if (recipients.length) {
       await executor.insert(notifications).values(
         recipients.map((recipient) => ({
           userId: recipient.userId,
           type: "registration_approved" as const,
-          title: "Sala ta a fost aprobată! 🎉",
-          message: "Sala ta este acum vizibilă pe ePetrecere.md. Bine ai venit!",
+          title: venueBecameActive ? "Localul și prima sală au fost aprobate! 🎉" : "Săli noi aprobate! 🎉",
+          message: venueBecameActive
+            ? "Localul este acum vizibil, împreună cu sălile aprobate. Celelalte săli rămân în verificare."
+            : "Sălile aprobate sunt vizibile; sălile încă în verificare rămân private.",
           actionUrl: dashboardPath,
           // A retry of the same decision is idempotent, while a genuine
           // reject -> resubmit -> approve cycle receives a fresh notice.
@@ -605,16 +633,21 @@ export async function approvePartnerVenue(adminUserId: string, venueId: number):
         })),
       ).onConflictDoNothing();
     }
-    return { kind: "success" as const, venue: row, recipients };
+    return { kind: "success" as const, venue: row, recipients, reviewedHallIds, remainingPendingHallCount, venueBecameActive };
   });
 
   if (decided.kind === "error") return decided.result;
   const updated = decided.venue;
-  return { ok: true, venue: updated, emails: decided.recipients };
+  return { ok: true, venue: updated, emails: decided.recipients, reviewedHallIds: decided.reviewedHallIds, remainingPendingHallCount: decided.remainingPendingHallCount, venueBecameActive: decided.venueBecameActive };
 }
 
-export async function rejectPartnerVenue(adminUserId: string, venueId: number): Promise<
-  | { ok: true; venue: typeof venues.$inferSelect; emails: Array<{ userId: string; email: string | null }> }
+export async function rejectPartnerVenue(
+  adminUserId: string,
+  venueId: number,
+  selectedHallIds?: readonly number[],
+  reviewReason?: string,
+): Promise<
+  | { ok: true; venue: typeof venues.$inferSelect; emails: Array<{ userId: string; email: string | null }>; reviewedHallIds: number[]; remainingPendingHallCount: number }
   | { ok: false; error: string; status: number; code?: string }
 > {
   const expected = await captureVenueRegistrationSnapshot(venueId);
@@ -692,6 +725,31 @@ export async function rejectPartnerVenue(adminUserId: string, venueId: number): 
         result: { ok: false as const, error: "booking_changed", status: 409, code: "NOT_PENDING" },
       };
     }
+    const pendingHallIds = current.halls
+      .filter((hall) => hall.status === "pending" &&
+        (current.venue.organizationId != null || hall.isLegacyDefault))
+      .map((hall) => hall.id);
+    const reviewedHallIds = selectedHallIds == null ? pendingHallIds : [...selectedHallIds];
+    if (
+      reviewedHallIds.length === 0 ||
+      new Set(reviewedHallIds).size !== reviewedHallIds.length ||
+      reviewedHallIds.some((id) => !pendingHallIds.includes(id)) ||
+      (current.venue.organizationId == null && selectedHallIds != null)
+    ) {
+      return {
+        kind: "error" as const,
+        result: { ok: false as const, error: "hall_selection_invalid", status: 409, code: "HALL_SELECTION_INVALID" },
+      };
+    }
+    const effectiveReviewReason = current.venue.organizationId == null
+      ? null
+      : reviewReason?.trim() || "Sălile au fost refuzate; contactează echipa pentru detalii.";
+    if (effectiveReviewReason && effectiveReviewReason.length > 1000) {
+      return {
+        kind: "error" as const,
+        result: { ok: false as const, error: "review_reason_too_long", status: 400, code: "REVIEW_REASON_INVALID" },
+      };
+    }
 
     const [venue] = await executor
       .select()
@@ -706,10 +764,11 @@ export async function rejectPartnerVenue(adminUserId: string, venueId: number): 
     }
     await tx
       .update(venueHalls)
-      .set({ status: "rejected", updatedAt: new Date() })
+      .set({ status: "rejected", reviewReason: effectiveReviewReason, updatedAt: new Date() })
       .where(and(
         eq(venueHalls.venueId, venueId),
         eq(venueHalls.status, "pending"),
+        inArray(venueHalls.id, reviewedHallIds),
         current.venue.organizationId == null
           ? eq(venueHalls.isLegacyDefault, true)
           : undefined,
@@ -743,23 +802,27 @@ export async function rejectPartnerVenue(adminUserId: string, venueId: number): 
         .set({ onboardingComplete: false, updatedAt: new Date() })
         .where(eq(users.id, current.venue.userId));
     }
+    const remainingPendingHallCount = current.halls.filter((hall) =>
+      hall.status === "pending" && !reviewedHallIds.includes(hall.id)).length;
     const recipients = await getVenueOwnerRecipients(venueId, executor);
     if (recipients.length) {
       await executor.insert(notifications).values(
         recipients.map((recipient) => ({
           userId: recipient.userId,
           type: "registration_rejected" as const,
-          title: "Cererea ta a fost refuzată",
-          message: "Sala ta nu a fost aprobată. Completează datele și retrimite cererea.",
+          title: "Sălile selectate nu au fost aprobate",
+          message: effectiveReviewReason
+            ? `Motiv: ${effectiveReviewReason} Corectează sălile și retrimite-le; cele aprobate rămân active.`
+            : "Corectează sala și retrimite cererea.",
           actionUrl,
           dedupeKey: `registration_rejected:${venueId}:${decisionKey}:${recipient.userId}`,
         })),
       ).onConflictDoNothing();
     }
-    return { kind: "success" as const, venue: row, recipients };
+    return { kind: "success" as const, venue: row, recipients, reviewedHallIds, remainingPendingHallCount };
   });
 
   if (decided.kind === "error") return decided.result;
   const updated = decided.venue;
-  return { ok: true, venue: updated, emails: decided.recipients };
+  return { ok: true, venue: updated, emails: decided.recipients, reviewedHallIds: decided.reviewedHallIds, remainingPendingHallCount: decided.remainingPendingHallCount };
 }

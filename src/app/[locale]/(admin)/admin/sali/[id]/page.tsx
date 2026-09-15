@@ -79,6 +79,7 @@ interface AdminHall {
   nameEn: string | null;
   slug: string;
   status: string;
+  reviewReason?: string | null;
   isLegacyDefault: boolean;
   capacityMin: number | null;
   capacityMax: number | null;
@@ -356,6 +357,9 @@ export default function AdminEditVenuePage() {
                       <p className="text-xs text-muted-foreground">
                         {hall.capacityMin ?? "—"}–{hall.capacityMax ?? "—"} · {adminHallPriceText(hall, t)}
                       </p>
+                      {hall.status === "rejected" && hall.reviewReason ? (
+                        <p className="mt-1 text-xs text-amber-500">{hall.reviewReason}</p>
+                      ) : null}
                     </div>
                     {hall.publicHref ? (
                       <Link

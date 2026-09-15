@@ -407,6 +407,7 @@ export function HallEditor({ venueId, hallId }: { venueId: number; hallId?: numb
   const [uploading, setUploading] = useState(false);
   const [loaded, setLoaded] = useState(hallId == null);
   const [hallStatus, setHallStatus] = useState<string | null>(null);
+  const [reviewReason, setReviewReason] = useState<string | null>(null);
   const [seatingDirty, setSeatingDirty] = useState(false);
   const [imagesDirty, setImagesDirty] = useState(false);
   const [menuDirty, setMenuDirty] = useState(false);
@@ -457,6 +458,7 @@ export function HallEditor({ venueId, hallId }: { venueId: number; hallId?: numb
     setForm(emptyHallForm());
     setLoaded(hallId == null);
     setHallStatus(null);
+    setReviewReason(null);
     setSeatingDirty(false);
     setImagesDirty(false);
     setMenuDirty(false);
@@ -578,6 +580,7 @@ export function HallEditor({ venueId, hallId }: { venueId: number; hallId?: numb
         if (cancelled || actorRef.current !== actorId || activeIdentityRef.current !== identity) return;
         const hall = data.hall as Record<string, unknown>;
         setHallStatus(typeof hall.status === "string" ? hall.status : null);
+        setReviewReason(typeof hall.reviewReason === "string" ? hall.reviewReason : null);
         setForm(hallFormFromApi(data));
         setAvailableMenuSets(menuSetsFromUnknown(data.menuSets));
         setMenuSetsLoading(false);
@@ -871,13 +874,21 @@ export function HallEditor({ venueId, hallId }: { venueId: number; hallId?: numb
       const editPath = localizePath(`/dashboard/locatii/${venueId}/sali/${id}`, locale);
       if (submit) {
         try {
-          const send = await fetch(`/api/venues/${venueId}/submit-approval`, { method: "POST" });
+          const send = await fetch(`/api/venues/${venueId}/submit-approval`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hallIds: [id] }),
+          });
           const sendData = await send.json().catch(() => ({}));
           if (actorRef.current !== actorId || activeIdentityRef.current !== identity) return;
           if (!send.ok) {
             const first = sendData.missing?.[0];
             setFieldError(first?.path || "submit");
-            toast.error(first?.message || "Draftul a fost salvat, dar lipsesc câmpuri pentru aprobare");
+            const message = first?.message === "hall_images_required" ? "Adaugă cel puțin o fotografie proprie a sălii."
+              : first?.message === "capacity_required" ? "Completează capacitatea minimă și maximă a sălii."
+              : first?.message === "hall_name_required" ? "Completează numele sălii."
+              : first?.message || "Draftul a fost salvat, dar lipsesc câmpuri pentru aprobare";
+            toast.error(message);
             router.replace(editPath);
             return;
           }
@@ -912,6 +923,11 @@ export function HallEditor({ venueId, hallId }: { venueId: number; hallId?: numb
     <Card>
       <CardContent className="space-y-6 p-5">
         <h1 className="font-heading text-2xl font-bold">{hallId ? "Editează sala" : "Adaugă sală"}</h1>
+        {hallStatus === "rejected" && reviewReason ? (
+          <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            Motivul refuzului: {reviewReason}
+          </p>
+        ) : null}
         {fieldError && <p className="text-sm text-red-400">Câmp: {fieldError}</p>}
         {hallId != null && editLoadFailed && (
           <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/5 p-4 text-sm">

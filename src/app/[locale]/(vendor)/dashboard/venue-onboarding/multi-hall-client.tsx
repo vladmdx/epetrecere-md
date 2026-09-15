@@ -1586,7 +1586,15 @@ export default function MultiHallVenueOnboarding() {
         jumpToMissing(data.missing ?? []);
         return;
       }
-      toast.success("Trimis la aprobare");
+      if (data.submitted) {
+        toast.success(data.skippedHallIds?.length
+          ? `Sălile pregătite au fost trimise; ${data.skippedHallIds.length} săli incomplete rămân draft.`
+          : "Trimis la aprobare");
+      } else {
+        toast.info(data.skippedHallIds?.length
+          ? "Nu a fost trimisă o sală nouă; sălile incomplete rămân editabile."
+          : "Cererea este deja trimisă sau aprobată.");
+      }
       router.push(localizePath("/dashboard/locatii", locale));
     } catch {
       if (isScopeTokenCurrent(scopeToken)) {

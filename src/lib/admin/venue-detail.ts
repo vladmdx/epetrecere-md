@@ -11,6 +11,7 @@ export type AdminVenueHallDetail = {
   nameEn: string | null;
   slug: string;
   status: string;
+  reviewReason?: string | null;
   isLegacyDefault: boolean;
   capacityMin: number | null;
   capacityMax: number | null;
@@ -44,6 +45,7 @@ export type AdminVenueHallSource = {
   nameEn: string | null;
   slug: string;
   status: string;
+  reviewReason?: string | null;
   isLegacyDefault: boolean;
   capacityMin: number | null;
   capacityMax: number | null;
@@ -132,6 +134,7 @@ export function mapAdminVenueHalls(input: {
       nameEn: hall.nameEn,
       slug: hall.slug,
       status: hall.status,
+      reviewReason: hall.reviewReason ?? null,
       isLegacyDefault: hall.isLegacyDefault,
       capacityMin: hall.capacityMin,
       capacityMax: hall.capacityMax,

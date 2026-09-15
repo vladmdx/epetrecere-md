@@ -19,6 +19,7 @@ import {
 import { jsonIfOrganizationBackedVenueDisabled } from "@/lib/partner/multi-hall-gate";
 import { adminContractsForVenue } from "@/lib/partner/legal";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { hallReviewIssues } from "@/lib/partner/hall-review";
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
@@ -273,10 +274,16 @@ export async function GET() {
         contracts: contractsForVenue(v),
         createdAt: v.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: v.userId,
+        organizationId: v.organizationId,
         userName: u?.name ?? null,
         userEmail: u?.email ?? null,
         organization: audit.organization,
-        halls: audit.halls,
+        halls: audit.halls.map((hall) => ({
+          ...hall,
+          reviewIssues: hall.status === "pending" && v.organizationId != null
+            ? hallReviewIssues(hall)
+            : [],
+        })),
         summaries: audit.summaries,
       };
     }),
@@ -294,9 +301,10 @@ export async function POST(req: Request) {
 
   const parsed = registrationDecisionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid registration decision" }, { status: 400 });
-  const { id, type, action } = parsed.data;
+  const { id, type, action, hallIds, reviewReason } = parsed.data;
 
   try {
+    let remainingPendingHallCount = 0;
     if (type === "artist") {
       const decided = action === "approve"
         ? await approvePartnerArtist(admin.id, id)
@@ -365,10 +373,29 @@ export async function POST(req: Request) {
       const orgBlocked = jsonIfOrganizationBackedVenueDisabled(venue.organizationId);
       if (orgBlocked) return orgBlocked;
 
+      if (venue.organizationId != null && !hallIds?.length) {
+        return NextResponse.json(
+          { error: "Selectează cel puțin o sală pentru această decizie", code: "HALL_SELECTION_REQUIRED" },
+          { status: 400 },
+        );
+      }
+      if (venue.organizationId == null && hallIds != null) {
+        return NextResponse.json(
+          { error: "Sala legacy nu acceptă selecție multi-sală", code: "HALL_SELECTION_INVALID" },
+          { status: 400 },
+        );
+      }
+      if (venue.organizationId != null && action === "reject" && !reviewReason) {
+        return NextResponse.json(
+          { error: "Scrie motivul refuzului (minimum 10 caractere)", code: "REVIEW_REASON_REQUIRED" },
+          { status: 400 },
+        );
+      }
+
       let decidedVenue = venue;
       let decisionEmails: Array<{ userId: string; email: string | null }> = [];
       if (action === "approve") {
-        const decided = await approvePartnerVenue(admin.id, id);
+        const decided = await approvePartnerVenue(admin.id, id, hallIds);
         if (!decided.ok) {
           return NextResponse.json(
             { error: decided.error, missing: decided.missing, code: decided.code },
@@ -377,8 +404,9 @@ export async function POST(req: Request) {
         }
         decidedVenue = decided.venue;
         decisionEmails = decided.emails;
+        remainingPendingHallCount = decided.remainingPendingHallCount;
       } else {
-        const decided = await rejectPartnerVenue(admin.id, id);
+        const decided = await rejectPartnerVenue(admin.id, id, hallIds, reviewReason);
         if (!decided.ok) {
           return NextResponse.json(
             { error: decided.error, code: decided.code },
@@ -387,6 +415,7 @@ export async function POST(req: Request) {
         }
         decidedVenue = decided.venue;
         decisionEmails = decided.emails;
+        remainingPendingHallCount = decided.remainingPendingHallCount;
       }
 
       // Reject may defensively withdraw a previously active-but-corrupt venue.
@@ -417,13 +446,18 @@ export async function POST(req: Request) {
         await sendEmail({
           to: email,
           subject: approved
-            ? "Sala ta pe ePetrecere.md a fost aprobată! 🎉"
-            : "Actualizare privind înregistrarea pe ePetrecere.md",
+            ? venue.organizationId != null ? "Sălile selectate au fost aprobate pe ePetrecere.md! 🎉" : "Sala ta pe ePetrecere.md a fost aprobată! 🎉"
+            : venue.organizationId != null ? "Actualizare privind sălile trimise la aprobare" : "Actualizare privind înregistrarea pe ePetrecere.md",
           html: registrationStatusEmail({
             name: decidedVenue.nameRo,
             type: "venue",
             approved,
-            ctaUrl: approvalCtaUrl,
+            ctaUrl: venue.organizationId != null
+              ? `https://epetrecere.md/dashboard/locatii/${decidedVenue.id}`
+              : approvalCtaUrl,
+            hallDecision: venue.organizationId != null,
+            remainingPendingHallCount,
+            rejectionReason: approved ? undefined : reviewReason,
           }),
         }).catch((err) => console.error(
           approved
@@ -434,7 +468,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, remainingPendingHallCount: type === "venue" ? remainingPendingHallCount : 0 });
   } catch (err) {
     console.error("[registration-requests] Error:", err);
     return NextResponse.json(

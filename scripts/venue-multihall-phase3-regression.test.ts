@@ -192,7 +192,7 @@ before(async () => {
     capacityMax: 120,
     pricingModel: "per_person",
     basePrice: 40,
-    imageUrls: [],
+    imageUrls: ["https://example.com/grand.jpg"],
   };
   const hallA = await createHallDraft(ids.owner, hallAPayload);
   assert.equal(hallA.ok, true);
@@ -208,7 +208,7 @@ before(async () => {
     nameRo: "Garden",
     capacityMin: 80,
     capacityMax: 250,
-    imageUrls: [],
+    imageUrls: ["https://example.com/garden.jpg"],
   });
   assert.equal(hallB.ok, true);
   if (hallB.ok) ids.hallB = hallB.hall.id;

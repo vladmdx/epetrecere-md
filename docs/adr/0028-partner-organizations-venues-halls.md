@@ -343,3 +343,29 @@ venue after aggregation, and requires `hallId` on public booking writes.
 Anonymous visitors never receive prices. This phase does not add migration
 `0040` and does not change the booking write path beyond existing Hall
 revalidation.
+
+## 9. Phase 6A.3 — independent Hall approval (local implementation)
+
+- The signed legal package remains scoped to the organization; adding a Venue
+  or Hall does not create a new contract. Venue publication requires approval
+  of at least one eligible pending Hall. A later pending Hall never removes an
+  already published Venue or its active Halls from the catalog.
+- Whole-Venue submission advances only eligible draft/rejected Halls. The Hall
+  editor submits its own Hall ID; incomplete sibling Halls stay private and
+  editable. New Halls require a name, slug, valid min/max capacity and at least
+  one Hall-specific photo. The imported legacy-default Hall may inherit the
+  Venue gallery.
+- An organization-backed admin decision explicitly selects Hall IDs. The
+  transaction rechecks pending scope and current content before touching only
+  those rows. Unreviewed pending Halls remain in the queue. A selected-Hall
+  rejection preserves an already-active Venue and records an editable reason
+  on that Hall; resubmission clears the reason.
+- Manual migration `0040_hall_review_reason.sql` mirrors the runtime schema,
+  stays server-only with RLS and revoked browser-role access, and is not a
+  Supabase timestamp migration. It has not been applied to a shared database,
+  nor has the code been deployed or pushed. Source/type checks pass; the DB
+  regression requires a post-`0040` disposable loopback database.
+- A separate legal-entity approval state and full admin reasons/history for
+  organization-level rejection remain future work. The current organization
+  lifecycle status is still reconciled from active Venues/pending Halls and
+  must not be described as an independent legal-review decision.

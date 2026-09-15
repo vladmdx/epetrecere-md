@@ -298,6 +298,8 @@ export const venueHalls = pgTable(
     bookingTermsEn: text("booking_terms_en"),
     isLegacyDefault: boolean("is_legacy_default").notNull().default(false),
     status: partnerEntityStatusEnum("status").notNull().default("draft"),
+    /** Server-written reason for the latest rejected review, private to admin/partner. */
+    reviewReason: text("review_reason"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

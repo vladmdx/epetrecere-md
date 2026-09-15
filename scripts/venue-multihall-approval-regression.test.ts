@@ -156,7 +156,7 @@ before(async () => {
     nameRo: "Grand",
     capacityMin: 20,
     capacityMax: 100,
-    imageUrls: [],
+    imageUrls: ["https://example.com/grand-hall.jpg"],
   });
   const submitted = await submitVenueForApproval(ids.owner, ids.venue);
   assert.equal(submitted.ok, true);
@@ -218,7 +218,7 @@ test("second venue with user_id NULL appears in the queue and approve does not d
     nameRo: "VIP",
     capacityMin: 10,
     capacityMax: 40,
-    imageUrls: [],
+    imageUrls: ["https://example.com/vip-hall.jpg"],
   });
   const submitted = await submitVenueForApproval(ids.owner, ids.venue2);
   assert.equal(submitted.ok, true);
@@ -233,6 +233,107 @@ test("second venue with user_id NULL appears in the queue and approve does not d
   assert.equal(second.userId, null);
   const [org] = await db.select({ status: partnerOrganizations.status }).from(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   assert.equal(org.status, "active");
+});
+
+test("one ready hall can publish a venue while an incomplete draft stays private; later rejection is hall-scoped", async () => {
+  let venueId = 0;
+  try {
+    const created = await saveVenueDraft(appUser(ids.owner), {
+      organizationId: ids.org,
+      createIntent: true,
+      createRequestId: randomUUID(),
+      name: MARK + "Partial review",
+      phone: PHONE,
+      city: "Chișinău",
+      address: "str. București 11",
+      imageUrls: ["https://example.com/partial-cover.jpg"],
+    });
+    assert.equal(created.ok, true, JSON.stringify(created));
+    if (!created.ok) assert.fail("partial venue create failed");
+    venueId = created.venue.id;
+    const ready = await createHallDraft(ids.owner, {
+      venueId, hallCreateRequestId: randomUUID(), nameRo: "Grand",
+      capacityMin: 20, capacityMax: 100,
+      imageUrls: ["https://example.com/partial-grand.jpg"],
+    });
+    const incomplete = await createHallDraft(ids.owner, {
+      venueId, hallCreateRequestId: randomUUID(), nameRo: "Garden",
+      capacityMin: 10, capacityMax: 40, imageUrls: [],
+    });
+    const anotherReady = await createHallDraft(ids.owner, {
+      venueId, hallCreateRequestId: randomUUID(), nameRo: "VIP",
+      capacityMin: 5, capacityMax: 20,
+      imageUrls: ["https://example.com/partial-vip.jpg"],
+    });
+    assert.equal(ready.ok, true);
+    assert.equal(incomplete.ok, true);
+    assert.equal(anotherReady.ok, true);
+    if (!ready.ok || !incomplete.ok || !anotherReady.ok) assert.fail("hall create failed");
+
+    const submitted = await submitVenueForApproval(ids.owner, venueId);
+    assert.equal(submitted.ok, true, JSON.stringify(submitted));
+    if (!submitted.ok) assert.fail("submission failed");
+    assert.deepEqual(submitted.submittedHallIds, [ready.hall.id, anotherReady.hall.id]);
+    assert.deepEqual(submitted.skippedHallIds, [incomplete.hall.id]);
+    const [draft] = await db.select({ status: venueHalls.status })
+      .from(venueHalls).where(eq(venueHalls.id, incomplete.hall.id));
+    assert.equal(draft.status, "draft");
+
+    const approved = await approvePartnerVenue(ids.admin, venueId, [ready.hall.id]);
+    assert.equal(approved.ok, true, JSON.stringify(approved));
+    if (!approved.ok) assert.fail("approval failed");
+    assert.equal(approved.venue.isActive, true);
+    assert.equal(approved.remainingPendingHallCount, 1);
+    assert.ok((await listPendingPartnerVenues()).some((row) => row.id === venueId));
+    const [stillDraft] = await db.select({ status: venueHalls.status })
+      .from(venueHalls).where(eq(venueHalls.id, incomplete.hall.id));
+    assert.equal(stillDraft.status, "draft");
+
+    const vipRejected = await rejectPartnerVenue(
+      ids.admin, venueId, [anotherReady.hall.id],
+      "Fotografia sălii VIP trebuie refăcută.",
+    );
+    assert.equal(vipRejected.ok, true, JSON.stringify(vipRejected));
+    if (!vipRejected.ok) assert.fail("VIP rejection failed");
+    assert.equal(vipRejected.venue.isActive, true);
+    assert.equal(vipRejected.remainingPendingHallCount, 0);
+
+    await db.insert(venueImages).values({
+      venueId, hallId: incomplete.hall.id,
+      url: "https://example.com/partial-garden.jpg",
+    });
+    const laterSubmit = await submitVenueForApproval(ids.owner, venueId, [incomplete.hall.id]);
+    assert.equal(laterSubmit.ok, true, JSON.stringify(laterSubmit));
+    const rejected = await rejectPartnerVenue(
+      ids.admin, venueId, [incomplete.hall.id],
+      "Fotografia sălii nu prezintă spațiul corect.",
+    );
+    assert.equal(rejected.ok, true, JSON.stringify(rejected));
+    if (!rejected.ok) assert.fail("rejection failed");
+    assert.equal(rejected.venue.isActive, true);
+    const [rejectedHall] = await db.select({ status: venueHalls.status, reason: venueHalls.reviewReason })
+      .from(venueHalls).where(eq(venueHalls.id, incomplete.hall.id));
+    assert.equal(rejectedHall.status, "rejected");
+    assert.match(rejectedHall.reason ?? "", /Fotografia sălii/);
+
+    const resubmitted = await submitVenueForApproval(ids.owner, venueId, [incomplete.hall.id]);
+    assert.equal(resubmitted.ok, true, JSON.stringify(resubmitted));
+    const [pendingHall] = await db.select({ status: venueHalls.status, reason: venueHalls.reviewReason })
+      .from(venueHalls).where(eq(venueHalls.id, incomplete.hall.id));
+    assert.equal(pendingHall.status, "pending");
+    assert.equal(pendingHall.reason, null);
+    const laterApproval = await approvePartnerVenue(ids.admin, venueId, [incomplete.hall.id]);
+    assert.equal(laterApproval.ok, true, JSON.stringify(laterApproval));
+    const [activeHall] = await db.select({ status: venueHalls.status })
+      .from(venueHalls).where(eq(venueHalls.id, incomplete.hall.id));
+    assert.equal(activeHall.status, "active");
+  } finally {
+    if (venueId) {
+      await db.delete(venueImages).where(eq(venueImages.venueId, venueId));
+      await db.delete(venueHalls).where(eq(venueHalls.venueId, venueId));
+      await db.delete(venues).where(eq(venues.id, venueId));
+    }
+  }
 });
 
 test("reject keeps the venue draft and does not delete onboarding work", async () => {
@@ -264,6 +365,11 @@ test("reject keeps the venue draft and does not delete onboarding work", async (
     url: "https://example.com/reject.jpg",
     sortOrder: 0,
     isCover: true,
+  });
+  await db.insert(venueImages).values({
+    venueId: draft.id,
+    hallId: hall.id,
+    url: "https://example.com/reject-hall.jpg",
   });
   const rejected = await rejectPartnerVenue(ids.admin, draft.id);
   assert.equal(rejected.ok, true);
