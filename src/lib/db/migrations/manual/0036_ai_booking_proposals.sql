@@ -276,7 +276,8 @@ BEGIN
         AND conislocal
         AND coninhcount = 0
         AND conparentid = 0
-        AND NOT connoinherit
+        -- PostgreSQL records PRIMARY KEY constraints as non-inheritable.
+        AND connoinherit
     )::integer
   INTO primary_count, canonical_primary_count
   FROM pg_constraint
@@ -399,7 +400,8 @@ BEGIN
           AND confupdtype = 'a'
           AND confmatchtype = 's'
           AND convalidated
-          AND NOT connoinherit
+          -- PostgreSQL records FOREIGN KEY constraints as non-inheritable.
+          AND connoinherit
           AND NOT condeferrable
           AND NOT condeferred
           AND conislocal

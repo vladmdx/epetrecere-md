@@ -256,6 +256,8 @@ DECLARE
   constraint_count integer;
   canonical_primary_count integer;
   repairable_fk_count integer;
+  legacy_fk_count integer;
+  legacy_unique_count integer;
 BEGIN
   SELECT attnum INTO id_attnum
   FROM pg_attribute
@@ -319,28 +321,37 @@ BEGIN
     AND constraint_row.convalidated
     AND NOT constraint_row.condeferrable
     AND NOT constraint_row.condeferred
-    AND NOT constraint_row.connoinherit
+    AND constraint_row.connoinherit
     AND constraint_row.conislocal
     AND constraint_row.coninhcount = 0
     AND constraint_row.conparentid = 0;
 
-  SELECT count(*)::integer
-  INTO repairable_fk_count
+  SELECT count(*) FILTER (
+      WHERE constraint_row.conname = expected.constraint_name
+    )::integer,
+    count(*) FILTER (
+      WHERE constraint_row.conname = expected.legacy_constraint_name
+    )::integer
+  INTO repairable_fk_count, legacy_fk_count
   FROM (VALUES
     ('referral_events_referrer_user_id_users_id_fk'::text,
+      'referral_events_referrer_user_id_fkey'::text,
       'referrer_user_id'::text),
-    ('referral_events_referred_user_id_users_id_fk', 'referred_user_id')
-  ) AS expected(constraint_name, source_column)
+    ('referral_events_referred_user_id_users_id_fk',
+      'referral_events_referred_user_id_fkey', 'referred_user_id')
+  ) AS expected(constraint_name, legacy_constraint_name, source_column)
   JOIN pg_constraint AS constraint_row
     ON constraint_row.conrelid = 'public.referral_events'::regclass
-   AND constraint_row.conname = expected.constraint_name
+   AND constraint_row.conname IN (
+     expected.constraint_name, expected.legacy_constraint_name
+   )
    AND constraint_row.contype = 'f'
    AND constraint_row.confrelid = 'public.users'::regclass
    AND constraint_row.confupdtype = 'a'
    AND constraint_row.confdeltype IN ('c', 'n')
    AND constraint_row.confmatchtype = 's'
    AND constraint_row.convalidated
-   AND NOT constraint_row.connoinherit
+   AND constraint_row.connoinherit
    AND NOT constraint_row.condeferrable
    AND NOT constraint_row.condeferred
    AND constraint_row.conislocal
@@ -355,17 +366,45 @@ BEGIN
    AND target_attribute.attname = 'id'
    AND constraint_row.confkey = ARRAY[target_attribute.attnum]::smallint[];
 
-  IF constraint_count <> 3
-    OR canonical_primary_count <> 1
-    OR repairable_fk_count <> 2
+  SELECT count(*)::integer INTO legacy_unique_count
+  FROM pg_constraint AS constraint_row
+  WHERE constraint_row.conrelid = 'public.referral_events'::regclass
+    AND constraint_row.conname =
+      'referral_events_referrer_user_id_referred_user_id_event_typ_key'
+    AND constraint_row.contype = 'u'
+    AND constraint_row.conkey = ARRAY[
+      (SELECT attnum FROM pg_attribute WHERE attrelid =
+        'public.referral_events'::regclass AND attname = 'referrer_user_id'),
+      (SELECT attnum FROM pg_attribute WHERE attrelid =
+        'public.referral_events'::regclass AND attname = 'referred_user_id'),
+      (SELECT attnum FROM pg_attribute WHERE attrelid =
+        'public.referral_events'::regclass AND attname = 'event_type')
+    ]::smallint[]
+    AND constraint_row.convalidated
+    AND NOT constraint_row.condeferrable
+    AND NOT constraint_row.condeferred
+    AND constraint_row.connoinherit
+    AND constraint_row.conislocal
+    AND constraint_row.coninhcount = 0
+    AND constraint_row.conparentid = 0;
+
+  IF canonical_primary_count <> 1 OR NOT (
+    (constraint_count = 3 AND repairable_fk_count = 2
+      AND legacy_fk_count = 0 AND legacy_unique_count = 0)
+    OR
+    (constraint_count = 4 AND repairable_fk_count = 0
+      AND legacy_fk_count = 2 AND legacy_unique_count = 1)
+  )
   THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
       MESSAGE = format(
-        '0038 requires the exact referral primary/FK constraints; count=%s primary=%s foreign=%s',
+        '0038 requires the exact canonical or legacy referral constraints; count=%s primary=%s canonical_fk=%s legacy_fk=%s legacy_unique=%s',
         constraint_count,
         canonical_primary_count,
-        repairable_fk_count
+        repairable_fk_count,
+        legacy_fk_count,
+        legacy_unique_count
       );
   END IF;
 END $$;
@@ -382,6 +421,8 @@ DECLARE
   unexpected_indexes text[];
   existing_kind "char";
   indexed_table oid;
+  legacy_unique_exists boolean;
+  legacy_index_exists boolean;
 BEGIN
   SELECT relation.relkind, index_catalog.indrelid
   INTO existing_kind, indexed_table
@@ -400,6 +441,21 @@ BEGIN
       MESSAGE = '0038 refuses a same-name object not indexing public.referral_events';
   END IF;
 
+  SELECT EXISTS (
+    SELECT 1 FROM pg_constraint AS constraint_row
+    WHERE constraint_row.conrelid = 'public.referral_events'::regclass
+      AND constraint_row.conname =
+        'referral_events_referrer_user_id_referred_user_id_event_typ_key'
+      AND constraint_row.contype = 'u'
+  ) INTO legacy_unique_exists;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname =
+        'referral_events_referrer_user_id_referred_user_id_event_typ_key'
+  ) INTO legacy_index_exists;
+
   SELECT count(*)::integer,
     array_agg(index_relation.relname ORDER BY index_relation.relname)
       FILTER (
@@ -407,6 +463,7 @@ BEGIN
           'referral_events_pkey',
           'idx_referral_referrer',
           'idx_referral_referred',
+          'referral_events_referrer_user_id_referred_user_id_event_typ_key',
           'referral_events_milestone_uidx'
         )
       )
@@ -416,7 +473,10 @@ BEGIN
     ON index_relation.oid = index_catalog.indexrelid
   WHERE index_catalog.indrelid = 'public.referral_events'::regclass;
 
-  IF index_count NOT IN (3, 4) OR unexpected_indexes IS NOT NULL THEN
+  IF index_count <> 3 + (existing_kind IS NOT NULL)::integer
+      + legacy_unique_exists::integer
+    OR legacy_index_exists IS DISTINCT FROM legacy_unique_exists
+    OR unexpected_indexes IS NOT NULL THEN
     RAISE EXCEPTION USING
       ERRCODE = '55000',
       MESSAGE = format(
@@ -451,6 +511,14 @@ BEGIN
         false,
         false,
         0
+      ),
+      (
+        'referral_events_referrer_user_id_referred_user_id_event_typ_key',
+        ARRAY['referrer_user_id', 'referred_user_id', 'event_type']::text[],
+        ARRAY['uuid_ops', 'uuid_ops', 'text_ops']::text[],
+        true,
+        false,
+        1
       )
     ) AS required(
       index_name,
@@ -460,6 +528,9 @@ BEGIN
       is_primary,
       constraint_backing_count
     )
+    WHERE required.index_name <>
+      'referral_events_referrer_user_id_referred_user_id_event_typ_key'
+      OR legacy_unique_exists
   LOOP
     SELECT count(*)::integer
     INTO canonical_count
@@ -531,6 +602,7 @@ BEGIN
         SELECT count(*)::integer
         FROM pg_constraint AS constraint_row
         WHERE constraint_row.conindid = index_catalog.indexrelid
+          AND constraint_row.conrelid = index_catalog.indrelid
       ) = expected.constraint_backing_count;
 
     IF canonical_count <> 1 THEN
@@ -544,13 +616,22 @@ BEGIN
   END LOOP;
 END $$;
 
+-- The legacy UNIQUE constraint is equivalent to the new milestone arbiter.
+-- Drop it only after exact preflight, under the ledger's exclusive lock; the
+-- replacement index is created later in this same transaction.
+ALTER TABLE public.referral_events
+  DROP CONSTRAINT IF EXISTS
+    referral_events_referrer_user_id_referred_user_id_event_typ_key;
+
 -- Preserve ledger evidence when either account is erased. Only the two
 -- identifying links are minimized. Named legacy CASCADE FKs or a previous
 -- canonical SET NULL application are accepted; every other constraint shape
 -- was rejected above before this repair begins.
 ALTER TABLE public.referral_events
-  DROP CONSTRAINT referral_events_referrer_user_id_users_id_fk,
-  DROP CONSTRAINT referral_events_referred_user_id_users_id_fk;
+  DROP CONSTRAINT IF EXISTS referral_events_referrer_user_id_users_id_fk,
+  DROP CONSTRAINT IF EXISTS referral_events_referred_user_id_users_id_fk,
+  DROP CONSTRAINT IF EXISTS referral_events_referrer_user_id_fkey,
+  DROP CONSTRAINT IF EXISTS referral_events_referred_user_id_fkey;
 
 ALTER TABLE public.referral_events
   ALTER COLUMN referrer_user_id DROP NOT NULL,
@@ -584,7 +665,7 @@ BEGIN
    AND constraint_row.confdeltype = 'n'
    AND constraint_row.confmatchtype = 's'
    AND constraint_row.convalidated
-   AND NOT constraint_row.connoinherit
+   AND constraint_row.connoinherit
    AND NOT constraint_row.condeferrable
    AND NOT constraint_row.condeferred
    AND constraint_row.conislocal

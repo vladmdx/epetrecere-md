@@ -446,7 +446,9 @@ BEGIN
     'account_blob_assets', 'account_blob_asset_claims', 'account_asset_erasure_outbox'
   ] LOOP
     SELECT array_agg(conname ORDER BY conname) INTO actual_constraints
-    FROM pg_constraint WHERE conrelid = format('public.%I', relation_name)::regclass;
+    FROM pg_constraint
+    WHERE conrelid = format('public.%I', relation_name)::regclass
+      AND contype IN ('p', 'f', 'u', 'c');
     expected_constraints := CASE relation_name
       WHEN 'account_blob_assets' THEN ARRAY[
         'account_blob_assets_key_chk','account_blob_assets_owner_user_fk',
@@ -529,9 +531,11 @@ BEGIN
       'public.account_blob_assets'::regclass,
       'public.account_blob_asset_claims'::regclass,
       'public.account_asset_erasure_outbox'::regclass
-    ) AND (
+    ) AND contype IN ('p', 'f', 'u', 'c') AND (
       NOT convalidated OR condeferrable OR condeferred OR NOT conislocal
-      OR coninhcount <> 0 OR conparentid <> 0 OR connoinherit
+      OR coninhcount <> 0 OR conparentid <> 0
+      OR (contype = 'c' AND connoinherit)
+      OR (contype IN ('p', 'f', 'u') AND NOT connoinherit)
     )
   ) THEN
     RAISE EXCEPTION USING
@@ -709,7 +713,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  IF (SELECT array_agg(attribute.attname ORDER BY key_position.ordinality)
+  IF (SELECT array_agg(attribute.attname::text ORDER BY key_position.ordinality)
       FROM pg_constraint constraint_row
       CROSS JOIN LATERAL unnest(constraint_row.conkey) WITH ORDINALITY key_position(attnum, ordinality)
       JOIN pg_attribute attribute ON attribute.attrelid = constraint_row.conrelid
@@ -717,7 +721,7 @@ BEGIN
       WHERE constraint_row.conrelid = 'public.account_blob_assets'::regclass
         AND constraint_row.conname = 'account_blob_assets_pkey' AND constraint_row.contype = 'p')
       IS DISTINCT FROM ARRAY['asset_key']::text[]
-    OR (SELECT array_agg(attribute.attname ORDER BY key_position.ordinality)
+    OR (SELECT array_agg(attribute.attname::text ORDER BY key_position.ordinality)
       FROM pg_constraint constraint_row
       CROSS JOIN LATERAL unnest(constraint_row.conkey) WITH ORDINALITY key_position(attnum, ordinality)
       JOIN pg_attribute attribute ON attribute.attrelid = constraint_row.conrelid
@@ -725,7 +729,7 @@ BEGIN
       WHERE constraint_row.conrelid = 'public.account_blob_asset_claims'::regclass
         AND constraint_row.conname = 'account_blob_asset_claims_pkey' AND constraint_row.contype = 'p')
       IS DISTINCT FROM ARRAY['claim_key']::text[]
-    OR (SELECT array_agg(attribute.attname ORDER BY key_position.ordinality)
+    OR (SELECT array_agg(attribute.attname::text ORDER BY key_position.ordinality)
       FROM pg_constraint constraint_row
       CROSS JOIN LATERAL unnest(constraint_row.conkey) WITH ORDINALITY key_position(attnum, ordinality)
       JOIN pg_attribute attribute ON attribute.attrelid = constraint_row.conrelid
@@ -733,7 +737,7 @@ BEGIN
       WHERE constraint_row.conrelid = 'public.account_asset_erasure_outbox'::regclass
         AND constraint_row.conname = 'account_asset_erasure_outbox_pkey' AND constraint_row.contype = 'p')
       IS DISTINCT FROM ARRAY['id']::text[]
-    OR (SELECT array_agg(attribute.attname ORDER BY key_position.ordinality)
+    OR (SELECT array_agg(attribute.attname::text ORDER BY key_position.ordinality)
       FROM pg_constraint constraint_row
       CROSS JOIN LATERAL unnest(constraint_row.conkey) WITH ORDINALITY key_position(attnum, ordinality)
       JOIN pg_attribute attribute ON attribute.attrelid = constraint_row.conrelid
@@ -802,7 +806,7 @@ BEGIN
       AND index_catalog.indnkeyatts = cardinality(expected.key_columns)
       AND index_catalog.indnatts = cardinality(expected.key_columns)
       AND (
-        SELECT array_agg(attribute.attname ORDER BY key_position.ordinality)
+        SELECT array_agg(attribute.attname::text ORDER BY key_position.ordinality)
         FROM unnest(index_catalog.indkey::smallint[]) WITH ORDINALITY
           AS key_position(attnum, ordinality)
         JOIN pg_attribute AS attribute
@@ -833,6 +837,7 @@ BEGIN
       AND (
         SELECT count(*)::integer FROM pg_constraint AS constraint_row
         WHERE constraint_row.conindid = index_catalog.indexrelid
+          AND constraint_row.conrelid = index_catalog.indrelid
       ) = expected.constraint_count;
     IF canonical_count <> 1 THEN
       RAISE EXCEPTION USING
@@ -1661,7 +1666,7 @@ BEGIN
   THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '0037 failed Blob orphan trigger fencing';
   END IF;
-  IF (SELECT array_agg(trigger_row.tgname ORDER BY trigger_row.tgname)
+  IF (SELECT array_agg(trigger_row.tgname::text ORDER BY trigger_row.tgname)
       FROM pg_trigger trigger_row
       WHERE trigger_row.tgrelid = 'public.account_blob_asset_claims'::regclass
         AND NOT trigger_row.tgisinternal)
@@ -1669,12 +1674,12 @@ BEGIN
         'account_blob_claim_mutation_fence_trg',
         'account_blob_claim_orphan_check_trg'
       ]::text[]
-    OR (SELECT array_agg(trigger_row.tgname ORDER BY trigger_row.tgname)
+    OR (SELECT array_agg(trigger_row.tgname::text ORDER BY trigger_row.tgname)
       FROM pg_trigger trigger_row
       WHERE trigger_row.tgrelid = 'public.account_blob_assets'::regclass
         AND NOT trigger_row.tgisinternal)
       IS DISTINCT FROM ARRAY['account_blob_owner_orphan_check_trg']::text[]
-    OR (SELECT array_agg(trigger_row.tgname ORDER BY trigger_row.tgname)
+    OR (SELECT array_agg(trigger_row.tgname::text ORDER BY trigger_row.tgname)
       FROM pg_trigger trigger_row
       WHERE trigger_row.tgrelid = 'public.account_asset_erasure_outbox'::regclass
         AND NOT trigger_row.tgisinternal) IS NOT NULL

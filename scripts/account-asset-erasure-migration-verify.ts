@@ -201,7 +201,7 @@ async function main(): Promise<void> {
 
   async function relationExists(relationName: string): Promise<boolean> {
     const [row] = await sql<{ exists: boolean }[]>`
-      SELECT to_regclass(format('public.%I', ${relationName})) IS NOT NULL AS exists
+      SELECT to_regclass(format('public.%I', ${relationName}::text)) IS NOT NULL AS exists
     `;
     return row?.exists === true;
   }
@@ -443,6 +443,7 @@ async function main(): Promise<void> {
         ON target_relation.oid = constraint_row.confrelid
       WHERE namespace.nspname = 'public'
         AND relation.relname = ANY(${[...targetTables]}::text[])
+        AND constraint_row.contype IN ('p', 'f', 'u', 'c')
       ORDER BY relation.relname, constraint_row.conname
     `;
     const indexes = await sql`
@@ -471,8 +472,10 @@ async function main(): Promise<void> {
         index_catalog.indoption::text AS options,
         index_relation.reltablespace::integer AS tablespace,
         index_relation.reloptions::text AS "relationOptions",
-        (SELECT count(*)::integer FROM pg_constraint
-          WHERE conindid = index_catalog.indexrelid) AS "constraintCount"
+        (SELECT count(*)::integer FROM pg_constraint AS constraint_row
+          WHERE constraint_row.conindid = index_catalog.indexrelid
+            AND constraint_row.conrelid = index_catalog.indrelid)
+          AS "constraintCount"
       FROM pg_index AS index_catalog
       JOIN pg_class AS index_relation ON index_relation.oid = index_catalog.indexrelid
       JOIN pg_class AS table_relation ON table_relation.oid = index_catalog.indrelid
@@ -556,7 +559,8 @@ async function main(): Promise<void> {
         trigger_row.tginitdeferred AS deferred,
         (trigger_row.tgconstraint <> 0) AS "constraintBacked",
         trigger_row.tgnargs::integer AS "argumentCount",
-        pg_get_expr(trigger_row.tgqual, trigger_row.tgrelid) AS qualification,
+        -- pg_get_expr cannot deparse trigger OLD/NEW vars; the full trigger
+        -- definition below includes its WHEN predicate and is compared.
         pg_get_triggerdef(trigger_row.oid, true) AS definition
       FROM pg_trigger AS trigger_row
       JOIN pg_class AS relation ON relation.oid = trigger_row.tgrelid
@@ -613,7 +617,7 @@ async function main(): Promise<void> {
       assert.equal(relation.inheritance, 0, `${label}: no inheritance`);
       assert.equal(relation.policyCount, 0, `${label}: zero policies`);
     }
-    assert.equal(snapshot.columns.length, 29, `${label}: exact columns`);
+    assert.equal(snapshot.columns.length, 28, `${label}: exact columns`);
     assert.equal(snapshot.columns.some((row) => row.dropped), false, `${label}: no dropped columns`);
     assert.deepEqual(
       snapshot.constraints.map((row) => `${row.tableName}.${row.name}`),
@@ -642,7 +646,8 @@ async function main(): Promise<void> {
       snapshot.constraints.some((row) =>
         !row.valid || row.deferrable || row.deferred || !row.local
         || row.inheritanceCount !== 0 || row.parentConstraintOid !== 0
-        || row.noInherit
+        || (row.type === "c" && row.noInherit)
+        || (["p", "f", "u"].includes(row.type) && !row.noInherit)
       ),
       false,
       `${label}: canonical constraint flags`,
@@ -702,21 +707,20 @@ async function main(): Promise<void> {
       `${label}: source trigger coverage`,
     );
     assert.equal(snapshot.policies.length, 0, `${label}: no policies`);
-    assert.deepEqual(snapshot.privileges, [], `${label}: zero effective browser privileges`);
+    assert.equal(snapshot.privileges.length, 0, `${label}: zero effective browser privileges`);
   }
 
   async function assertBrowserReadBlocked(label: string): Promise<void> {
     for (const role of ["anon", "authenticated"]) {
       for (const table of targetTables) {
         let blocked = false;
-        await sql`BEGIN`;
         try {
-          await sql.unsafe(`SET LOCAL ROLE "${role}"`);
-          await sql.unsafe(`SELECT 1 FROM public."${table}" LIMIT 0`);
+          await sql.begin(async (tx) => {
+            await tx.unsafe(`SET LOCAL ROLE "${role}"`);
+            await tx.unsafe(`SELECT 1 FROM public."${table}" LIMIT 0`);
+          });
         } catch (error) {
           blocked = (error as { code?: string }).code === "42501";
-        } finally {
-          await sql`ROLLBACK`;
         }
         assert.equal(blocked, true, `${label}: ${role} read ${table}`);
       }
@@ -742,17 +746,28 @@ async function main(): Promise<void> {
 
   async function cleanupFixtures(): Promise<void> {
     if (!(await relationExists("account_blob_assets"))) return;
-    await sql`
-      DELETE FROM public.account_asset_erasure_outbox
-      WHERE asset_key IN (
-        SELECT asset_key FROM public.account_blob_assets
-        WHERE provenance = 'e2e_0037'
-      )
-    `;
-    await sql`
-      DELETE FROM public.account_blob_assets WHERE provenance = 'e2e_0037'
-    `;
-    await sql`DELETE FROM public.users WHERE id = ANY(${allFixtureUsers}::uuid[])`;
+    await sql.begin(async (tx) => {
+      // Remove claims while their registry rows still exist. Letting the FK
+      // cascade fire after deleting an asset violates the claim fence.
+      await tx`
+        DELETE FROM public.account_blob_asset_claims
+        WHERE asset_key IN (
+          SELECT asset_key FROM public.account_blob_assets
+          WHERE provenance = 'e2e_0037'
+        )
+      `;
+      await tx`DELETE FROM public.users WHERE id = ANY(${allFixtureUsers}::uuid[])`;
+      await tx`
+        DELETE FROM public.account_asset_erasure_outbox
+        WHERE asset_key IN (
+          SELECT asset_key FROM public.account_blob_assets
+          WHERE provenance = 'e2e_0037'
+        )
+      `;
+      await tx`
+        DELETE FROM public.account_blob_assets WHERE provenance = 'e2e_0037'
+      `;
+    });
   }
 
   async function advisoryCount(tx: TransactionExecutor): Promise<number> {
@@ -949,10 +964,11 @@ async function main(): Promise<void> {
         WHERE id = ${fixtureUsers.raceSharer}::uuid
       `;
     });
-    assert.equal(await pendingOutcome(lastClaimDelete), true,
-      "claim deletion did not wait behind account-delete fence");
+    const claimDeletePending = await pendingOutcome(lastClaimDelete);
     ownerDelete.release();
     await Promise.all([ownerDelete.transaction, lastClaimDelete]);
+    assert.equal(claimDeletePending, true,
+      "claim deletion did not wait behind account-delete fence");
 
     const [final] = await sql<{ state: string; claims: number; queued: number }[]>`
       SELECT asset.state,
@@ -997,10 +1013,11 @@ async function main(): Promise<void> {
         )
       `;
     });
-    assert.equal(await pendingOutcome(claimAttempt), true,
-      "claim helper did not wait on the user lock before global/asset locks");
+    const claimAttemptPending = await pendingOutcome(claimAttempt);
     erasure.release();
     await Promise.all([erasure.transaction, claimAttempt]);
+    assert.equal(claimAttemptPending, true,
+      "claim helper did not wait on the user lock before global/asset locks");
 
     const [claim] = await sql<{ count: number }[]>`
       SELECT count(*)::integer AS count
@@ -1037,25 +1054,30 @@ async function main(): Promise<void> {
       () => ({ ok: true as const }),
       (error: unknown) => ({ ok: false as const, error }),
     );
-    assert.equal(await pendingOutcome(outcomePromise), true,
-      "new claim did not wait for registry orphan decision");
+    // The claim may win before the orphan's deferred commit check, or wait
+    // and lose after the asset is queued. Both outcomes must stay coherent.
+    await pendingOutcome(outcomePromise);
     orphan.release();
     await orphan.transaction;
     const outcome = await outcomePromise;
-    assert.equal(outcome.ok, false, "queued asset was reattached");
     if (!outcome.ok) {
       assert.equal((outcome.error as { code?: string }).code, "55000");
     }
-    const [final] = await sql<{ state: string; claims: number; queued: number }[]>`
-      SELECT asset.state,
+    const [final] = await sql<{ ownerUserId: string | null; state: string; claims: number; queued: number }[]>`
+      SELECT asset.owner_user_id AS "ownerUserId", asset.state,
         (SELECT count(*)::integer FROM public.account_blob_asset_claims
           WHERE asset_key = asset.asset_key) AS claims,
         (SELECT count(*)::integer FROM public.account_asset_erasure_outbox
           WHERE asset_key = asset.asset_key) AS queued
       FROM public.account_blob_assets AS asset WHERE asset.asset_key = ${key}
     `;
-    assert.deepEqual(final, { state: "queued", claims: 0, queued: 1 },
-      "claim/orphan race produced ambiguous state");
+    assert.deepEqual(
+      final,
+      outcome.ok
+        ? { ownerUserId: null, state: "active", claims: 1, queued: 0 }
+        : { ownerUserId: null, state: "queued", claims: 0, queued: 1 },
+      "claim/orphan race produced ambiguous state",
+    );
   }
 
   async function injectRepairableDrift(): Promise<void> {

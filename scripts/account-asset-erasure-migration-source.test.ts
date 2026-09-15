@@ -181,7 +181,7 @@ test("the DB verifier is guard-only, exhaustive and packaged", () => {
   assert.match(verifier, /expectTransactionalMigrationRejected/);
   assert.match(verifier, /pg_locks/);
   assert.match(verifier, /claim deletion did not wait behind account-delete fence/);
-  assert.match(verifier, /new claim did not wait for registry orphan decision/);
+  assert.match(verifier, /claim\/orphan race produced ambiguous state/);
   assert.match(verifier, /claim helper did not wait on the user lock before global\/asset locks/);
   assert.match(verifier, /unattached generic draft was swept without prior claim provenance/);
   assert.match(runner, /verifyE2EDatabase\(config\)/);

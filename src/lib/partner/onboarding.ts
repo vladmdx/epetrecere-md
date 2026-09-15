@@ -1318,6 +1318,22 @@ export async function submitVenueForApproval(
         status: 403 as const,
       };
     }
+    // A global admin may see the organization lifecycle even when its
+    // capability gate denies writes. Do not expose that state to other actors.
+    if (
+      actor.isGlobalAdmin &&
+      (!current.organization ||
+        !ORG_STATUSES_ALLOWING_ACCESS.includes(
+          current.organization.status as (typeof ORG_STATUSES_ALLOWING_ACCESS)[number],
+        ))
+    ) {
+      return {
+        ok: false as const,
+        code: "ORGANIZATION_NOT_SUBMITTABLE" as const,
+        error: "ORGANIZATION_NOT_SUBMITTABLE",
+        status: 409 as const,
+      };
+    }
     const access = await authorizeOrganizationCapabilityLocked(
       actor,
       current.venue.organizationId,

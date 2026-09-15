@@ -5,10 +5,11 @@
  * Run:
  *   npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-complex-security-regression.test.ts
  */
-import { after, before, describe, test } from "node:test";
+import { after, afterEach, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { e2eDatabaseConfig, verifyE2EDatabase } from "../e2e/helpers/safety";
 
 import { db } from "../src/lib/db";
 import {
@@ -106,6 +107,21 @@ async function createUser(suffix: string) {
     })
     .returning({ id: users.id });
   return row.id;
+}
+
+async function deleteDisposableLegalAcceptances(predicate: SQL) {
+  const config = e2eDatabaseConfig();
+  if (process.env.E2E_RUNTIME !== "1" || process.env.DATABASE_URL !== config.url) {
+    throw new Error("Legal fixture cleanup is allowed only in the guarded loopback E2E database.");
+  }
+  await verifyE2EDatabase(config);
+  await db.transaction(async (tx) => {
+    // Keep every production-like constraint active; disable only the
+    // append-only trigger while removing disposable test signatures.
+    await tx.execute(sql`ALTER TABLE public.legal_acceptances DISABLE TRIGGER legal_acceptances_append_only`);
+    await tx.delete(legalAcceptances).where(predicate);
+    await tx.execute(sql`ALTER TABLE public.legal_acceptances ENABLE TRIGGER legal_acceptances_append_only`);
+  });
 }
 
 async function signOrganizationContract(userId: string, organizationId: number) {
@@ -570,6 +586,16 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
     await signLegacyVenueContract(ids.legacyQueueOwner);
   });
 
+  afterEach(async () => {
+    if (!ids.attacker || createdVenueIds.length === 0) return;
+    // The production legacy UNIQUE(venues.user_id) remains in force. Free the
+    // test owner's slot after each scenario without changing that constraint.
+    await db
+      .update(venues)
+      .set({ userId: null })
+      .where(and(inArray(venues.id, createdVenueIds), eq(venues.userId, ids.attacker)));
+  });
+
   after(async () => {
     const allUserIds = [
       ids.attacker,
@@ -597,9 +623,9 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
       ...createdOrganizationIds,
     ].filter(Boolean);
     if (organizationIds.length > 0) {
-      await db
-        .delete(legalAcceptances)
-        .where(inArray(legalAcceptances.organizationId, organizationIds));
+      await deleteDisposableLegalAcceptances(
+        inArray(legalAcceptances.organizationId, organizationIds),
+      );
       await db
         .delete(partnerOrganizationMembers)
         .where(inArray(partnerOrganizationMembers.organizationId, organizationIds));
@@ -608,9 +634,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
         .where(inArray(partnerOrganizations.id, organizationIds));
     }
     if (allUserIds.length > 0) {
-      await db
-        .delete(legalAcceptances)
-        .where(inArray(legalAcceptances.userId, allUserIds));
+      await deleteDisposableLegalAcceptances(inArray(legalAcceptances.userId, allUserIds));
     }
     if (allUserIds.length > 0) {
       await db.delete(users).where(inArray(users.id, allUserIds));
@@ -674,7 +698,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
     } finally {
       await db.delete(notifications).where(eq(notifications.userId, ownerId));
       await db.delete(artists).where(eq(artists.id, artist.id));
-      await db.delete(legalAcceptances).where(eq(legalAcceptances.userId, ownerId));
+      await deleteDisposableLegalAcceptances(eq(legalAcceptances.userId, ownerId));
       await db.delete(users).where(eq(users.id, ownerId));
     }
   });
@@ -727,7 +751,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
           city: "Chișinău",
         },
         {
-          userId: ids.foreignOwner,
+          userId: ids.organizationBOwner,
           organizationId: null,
           nameRo: `${MARK} Read foreign legacy`,
           slug: `${MARK}_read_foreign_legacy`,
@@ -1361,7 +1385,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
       await db.delete(venueImages).where(eq(venueImages.venueId, legacyVenue.id));
       await db.delete(venueHalls).where(eq(venueHalls.venueId, legacyVenue.id));
       await db.delete(venues).where(eq(venues.id, legacyVenue.id));
-      await db.delete(legalAcceptances).where(eq(legalAcceptances.organizationId, organization.id));
+      await deleteDisposableLegalAcceptances(eq(legalAcceptances.organizationId, organization.id));
       await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, organization.id));
       await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, organization.id));
       await db.delete(users).where(inArray(users.id, [ownerId, submittingAdminId]));
@@ -1495,7 +1519,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
       await db.delete(venueImages).where(eq(venueImages.venueId, legacyVenue.id));
       await db.delete(venueHalls).where(eq(venueHalls.venueId, legacyVenue.id));
       await db.delete(venues).where(eq(venues.id, legacyVenue.id));
-      await db.delete(legalAcceptances).where(eq(legalAcceptances.organizationId, organization.id));
+      await deleteDisposableLegalAcceptances(eq(legalAcceptances.organizationId, organization.id));
       await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, organization.id));
       await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, organization.id));
       await db.delete(users).where(eq(users.id, ownerId));
@@ -1588,7 +1612,7 @@ describe("multi-hall complex ownership and concurrency", { concurrency: false },
       await db.delete(venueImages).where(eq(venueImages.venueId, legacyVenue.id));
       await db.delete(venueHalls).where(eq(venueHalls.venueId, legacyVenue.id));
       await db.delete(venues).where(eq(venues.id, legacyVenue.id));
-      await db.delete(legalAcceptances).where(eq(legalAcceptances.organizationId, organization.id));
+      await deleteDisposableLegalAcceptances(eq(legalAcceptances.organizationId, organization.id));
       await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, organization.id));
       await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, organization.id));
       await db.delete(users).where(eq(users.id, ownerId));

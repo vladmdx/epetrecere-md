@@ -2,7 +2,7 @@
  * Verify manual migration 0038 on a guarded disposable loopback database.
  *
  * The guarded runner validates the database-resident marker before importing
- * this module. This verifier requires the exact canonical referral ledger
+ * this module. This verifier requires the exact canonical or validated legacy referral ledger
  * before its milestone arbiter, proves duplicate evidence fails closed, then
  * applies 0038 twice around safe index/RLS/policy/ACL drift and compares the
  * complete catalog and financial state.
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
 
   async function relationExists(relationName: string): Promise<boolean> {
     const [row] = await sql<{ exists: boolean }[]>`
-      SELECT to_regclass(format('public.%I', ${relationName})) IS NOT NULL
+      SELECT to_regclass(format('public.%I', ${relationName}::text)) IS NOT NULL
         AS exists
     `;
     return row?.exists === true;
@@ -745,7 +745,7 @@ async function main(): Promise<void> {
 
   function assertStructure(
     shape: Awaited<ReturnType<typeof currentShape>>,
-    mode: "baseline" | "hardened",
+    mode: "baseline" | "baselineLegacy" | "hardened",
     label: string,
   ): void {
     const actualColumns = shape.columns.map((column) => {
@@ -771,8 +771,8 @@ async function main(): Promise<void> {
         "event_type:text:NO:<none>:NO:NEVER",
         "id:integer:NO:nextval('referral_events_id_seq'::regclass):NO:NEVER",
         "metadata:jsonb:YES:'{}'::jsonb:NO:NEVER",
-        `referred_user_id:uuid:${mode === "baseline" ? "NO" : "YES"}:<none>:NO:NEVER`,
-        `referrer_user_id:uuid:${mode === "baseline" ? "NO" : "YES"}:<none>:NO:NEVER`,
+        `referred_user_id:uuid:${mode !== "hardened" ? "NO" : "YES"}:<none>:NO:NEVER`,
+        `referrer_user_id:uuid:${mode !== "hardened" ? "NO" : "YES"}:<none>:NO:NEVER`,
       ],
       `${label} columns`,
     );
@@ -792,7 +792,7 @@ async function main(): Promise<void> {
       shape.relation.serialDependencyCount !== 1 ||
       shape.relation.ownedSequenceCount !== 1 ||
       shape.relation.policyCount !== 0 ||
-      (mode === "baseline" &&
+      (mode !== "hardened" &&
         (shape.relation.rowSecurity || shape.relation.forceRowSecurity)) ||
       (mode === "hardened" &&
         (!shape.relation.rowSecurity || shape.relation.forceRowSecurity))
@@ -823,26 +823,42 @@ async function main(): Promise<void> {
         },
       ],
       [
-        "referral_events_referred_user_id_users_id_fk",
+        mode === "baselineLegacy"
+          ? "referral_events_referred_user_id_fkey"
+          : "referral_events_referred_user_id_users_id_fk",
         {
           type: "f",
           source: ["referred_user_id"],
           target: "users",
           targetColumns: ["id"],
-          deleteAction: mode === "baseline" ? "c" : "n",
+          deleteAction: mode !== "hardened" ? "c" : "n",
         },
       ],
       [
-        "referral_events_referrer_user_id_users_id_fk",
+        mode === "baselineLegacy"
+          ? "referral_events_referrer_user_id_fkey"
+          : "referral_events_referrer_user_id_users_id_fk",
         {
           type: "f",
           source: ["referrer_user_id"],
           target: "users",
           targetColumns: ["id"],
-          deleteAction: mode === "baseline" ? "c" : "n",
+          deleteAction: mode !== "hardened" ? "c" : "n",
         },
       ],
     ]);
+    if (mode === "baselineLegacy") {
+      expectedConstraints.set(
+        "referral_events_referrer_user_id_referred_user_id_event_typ_key",
+        {
+          type: "u",
+          source: ["referrer_user_id", "referred_user_id", "event_type"],
+          target: null,
+          targetColumns: [],
+          deleteAction: " ",
+        },
+      );
+    }
     if (shape.constraints.length !== expectedConstraints.size) {
       throw new Error(
         `${label}: wrong constraints ${JSON.stringify(shape.constraints)}`,
@@ -863,7 +879,7 @@ async function main(): Promise<void> {
             constraint.updateAction !== "a" ||
             constraint.matchType !== "s")) ||
         !constraint.valid ||
-        constraint.noInherit ||
+        !constraint.noInherit ||
         constraint.deferrable ||
         constraint.deferred ||
         !constraint.local ||
@@ -917,6 +933,18 @@ async function main(): Promise<void> {
         },
       ],
     ]);
+    if (mode === "baselineLegacy") {
+      expectedIndexes.set(
+        "referral_events_referrer_user_id_referred_user_id_event_typ_key",
+        {
+          columns: ["referrer_user_id", "referred_user_id", "event_type"],
+          opclasses: ["uuid_ops", "uuid_ops", "text_ops"],
+          unique: true,
+          primary: false,
+          constraintBacked: 1,
+        },
+      );
+    }
     if (mode === "hardened") {
       expectedIndexes.set(targetIndex, {
         columns: ["referrer_user_id", "referred_user_id", "event_type"],
@@ -1379,51 +1407,80 @@ async function main(): Promise<void> {
     }
 
     const baselineShape = await currentShape();
-    assertStructure(baselineShape, "baseline", "0038 exact pre-index baseline");
+    const baselineMode = baselineShape.constraints.some(
+      (constraint) =>
+        constraint.constraintName ===
+        "referral_events_referrer_user_id_referred_user_id_event_typ_key",
+    )
+      ? "baselineLegacy"
+      : "baseline";
+    assertStructure(baselineShape, baselineMode, "0038 exact pre-index baseline");
     const baselineFinancial = await financialSnapshot();
 
-    await seedDuplicateFixture();
-    const duplicateFinancial = await financialSnapshot();
-    expectMigrationRejected(
-      config.url,
-      "0038 duplicate-evidence fail-closed probe",
-      /duplicate referral milestones/i,
-    );
-    assertUnchanged(
-      duplicateFinancial,
-      await financialSnapshot(),
-      "0038 rejected duplicate evidence",
-    );
-    const [preservedDuplicates] = await sql<
-      {
-        count: number;
-        creditTotal: string;
-      }[]
-    >`
-      SELECT count(*)::int AS count,
-        coalesce(sum(credit_cents), 0)::text AS "creditTotal"
-      FROM public.referral_events
-      WHERE id IN (${fixtureEventIds[0]}, ${fixtureEventIds[1]})
-    `;
-    if (
-      preservedDuplicates?.count !== 2 ||
-      preservedDuplicates.creditTotal !== "1500"
-    ) {
-      throw new Error(
-        `0038 rejected migration changed duplicate evidence: ${JSON.stringify(preservedDuplicates)}`,
+    if (baselineMode === "baselineLegacy") {
+      try {
+        await seedDuplicateFixture();
+        throw new Error("0038 legacy UNIQUE unexpectedly accepted duplicate evidence");
+      } catch (error) {
+        if ((error as { code?: string }).code !== "23505") throw error;
+        console.log("-- 0038 legacy UNIQUE rejected duplicate evidence as expected");
+      } finally {
+        await cleanupDuplicateFixture();
+      }
+      assertUnchanged(
+        baselineShape,
+        await currentShape(),
+        "0038 legacy UNIQUE duplicate rejection catalog",
+      );
+      assertUnchanged(
+        baselineFinancial,
+        await financialSnapshot(),
+        "0038 legacy UNIQUE duplicate fixture cleanup",
+      );
+    } else {
+      await seedDuplicateFixture();
+      const duplicateFinancial = await financialSnapshot();
+      expectMigrationRejected(
+        config.url,
+        "0038 duplicate-evidence fail-closed probe",
+        /duplicate referral milestones/i,
+      );
+      assertUnchanged(
+        duplicateFinancial,
+        await financialSnapshot(),
+        "0038 rejected duplicate evidence",
+      );
+      const [preservedDuplicates] = await sql<
+        {
+          count: number;
+          creditTotal: string;
+        }[]
+      >`
+        SELECT count(*)::int AS count,
+          coalesce(sum(credit_cents), 0)::text AS "creditTotal"
+        FROM public.referral_events
+        WHERE id IN (${fixtureEventIds[0]}, ${fixtureEventIds[1]})
+      `;
+      if (
+        preservedDuplicates?.count !== 2 ||
+        preservedDuplicates.creditTotal !== "1500"
+      ) {
+        throw new Error(
+          `0038 rejected migration changed duplicate evidence: ${JSON.stringify(preservedDuplicates)}`,
+        );
+      }
+      assertUnchanged(
+        baselineShape,
+        await currentShape(),
+        "0038 catalog after duplicate rejection",
+      );
+      await cleanupDuplicateFixture();
+      assertUnchanged(
+        baselineFinancial,
+        await financialSnapshot(),
+        "0038 duplicate fixture cleanup",
       );
     }
-    assertUnchanged(
-      baselineShape,
-      await currentShape(),
-      "0038 catalog after duplicate rejection",
-    );
-    await cleanupDuplicateFixture();
-    assertUnchanged(
-      baselineFinancial,
-      await financialSnapshot(),
-      "0038 duplicate fixture cleanup",
-    );
 
     await verifyLegacyGraphFailsClosed();
     assertUnchanged(
@@ -1569,7 +1626,7 @@ async function main(): Promise<void> {
         label: "0038 extra-constraint lookalike",
         setup:
           "ALTER TABLE public.referral_events ADD CONSTRAINT epetrecere_0038_extra_chk CHECK (true) NOT VALID",
-        failure: /exact referral primary\/FK constraints/i,
+        failure: /exact canonical or legacy referral constraints/i,
       },
       {
         label: "0038 extra-index lookalike",

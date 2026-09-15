@@ -602,7 +602,7 @@ async function main(): Promise<void> {
       JSON.stringify(primaryKeys[0]?.sourceColumns) !==
         JSON.stringify(["id"]) ||
       !primaryKeys[0].valid ||
-      primaryKeys[0].noInherit ||
+      !primaryKeys[0].noInherit ||
       primaryKeys[0].deferrable ||
       primaryKeys[0].deferred ||
       !primaryKeys[0].local ||
@@ -662,7 +662,7 @@ async function main(): Promise<void> {
         foreignKey.updateAction !== "a" ||
         foreignKey.matchType !== "s" ||
         !foreignKey.valid ||
-        foreignKey.noInherit ||
+        !foreignKey.noInherit ||
         foreignKey.deferrable ||
         foreignKey.deferred ||
         !foreignKey.local ||
