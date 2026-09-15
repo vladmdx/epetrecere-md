@@ -8,6 +8,10 @@ import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
+import type { ESignatureValue } from "@/components/legal/e-signature";
+import { useLocale } from "@/hooks/use-locale";
+import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { legalEvidenceMatchesManifest } from "@/lib/legal/pack-manifest";
 import {
   clearPendingOrganizationCreateRequest,
@@ -51,6 +55,7 @@ type Contract = {
 type VenueRow = { id: number; nameRo: string; isActive: boolean; slug: string };
 
 export function OrganizationDashboard({ organizationId }: { organizationId?: number }) {
+  const { locale } = useLocale();
   const { isLoaded: userLoaded, user } = useUser();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [selected, setSelected] = useState<number | null>(organizationId ?? null);
@@ -64,11 +69,20 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
   const [hasPendingOrganizationCreate, setHasPendingOrganizationCreate] = useState(false);
   const [organizationCreateRecoveryOnly, setOrganizationCreateRecoveryOnly] = useState(false);
   const [resolvedActorId, setResolvedActorId] = useState<string | null>(null);
+  const [contractSignature, setContractSignature] = useState<ESignatureValue | null>(null);
+  const [showContractValidation, setShowContractValidation] = useState(false);
+  const [signingContract, setSigningContract] = useState(false);
   const organizationCreateRequest = useRef<PendingOrganizationCreateRequest | null>(null);
   const actorRef = useRef<string | null>(null);
   const selectedRef = useRef<number | null>(organizationId ?? null);
   const detailRequestRef = useRef<string | null>(null);
   const detailRequestGenerationRef = useRef(0);
+  const agreement = useOnboardingAgreement(
+    "venue",
+    userLoaded && user?.id === resolvedActorId ? user.id : undefined,
+    locale,
+    selected ?? undefined,
+  );
 
   const contractSessions = new Map<string, Contract[]>();
   for (const contract of detail?.contracts ?? []) {
@@ -84,6 +98,9 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
     setSelected(nextOrganizationId);
     setDetail(null);
     setMembers([]);
+    setContractSignature(null);
+    setShowContractValidation(false);
+    setSigningContract(false);
   }, []);
 
   const loadList = useCallback(async (actorId: string) => {
@@ -184,6 +201,36 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
   }, [selected, loadDetail, resolvedActorId, user?.id]);
 
   const actorReady = userLoaded && Boolean(user?.id) && resolvedActorId === user?.id;
+
+  async function signOrganizationContract() {
+    const actorId = user?.id;
+    const organizationIdToSign = selected;
+    if (!actorReady || !actorId || !organizationIdToSign || signingContract
+      || detail?.organization.id !== organizationIdToSign
+      || detail.organization.capabilities?.manageLegal !== true) return;
+    setSigningContract(true);
+    try {
+      await agreement.prepare(contractSignature);
+      if (actorRef.current !== actorId || selectedRef.current !== organizationIdToSign) return;
+      const response = await fetch(`/api/organizations/${organizationIdToSign}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("Contractul nu a putut fi verificat.");
+      const result = await response.json();
+      if (result?.organization?.id !== organizationIdToSign || result.organization.hasValidContract !== true) {
+        throw new Error("Contractul semnat nu corespunde datelor juridice ale organizației. Verifică datele și contactează suportul.");
+      }
+      if (actorRef.current !== actorId || selectedRef.current !== organizationIdToSign) return;
+      await loadDetail(organizationIdToSign, actorId);
+      toast.success("Contractul organizației a fost semnat.");
+    } catch (error) {
+      if (actorRef.current !== actorId || selectedRef.current !== organizationIdToSign) return;
+      setShowContractValidation(true);
+      toast.error(error instanceof Error ? error.message : "Contractul nu a putut fi semnat.");
+    } finally {
+      if (actorRef.current === actorId && selectedRef.current === organizationIdToSign) {
+        setSigningContract(false);
+      }
+    }
+  }
 
   async function createOrg() {
     if (creatingOrganization) return;
@@ -402,6 +449,21 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
               <p><strong>{detail.organization.displayName}</strong> · {detail.organization.type} · {detail.organization.status}</p>
               <p>Contract valabil: {detail.organization.hasValidContract ? "da" : "nu"}</p>
               <p>Un local nou pe o organizație cu contract nu cere re-semnare.</p>
+              {!detail.organization.hasValidContract && detail.organization.capabilities?.manageLegal === true && (
+                <div className="space-y-3 rounded-lg border border-amber-500/40 p-3">
+                  <p>Contractele semnate anterior pentru local rămân păstrate, dar nu sunt contractul companiei. Semnează contractul organizației înainte de a adăuga un local nou.</p>
+                  <OnboardingAgreement
+                    key={`${resolvedActorId ?? "no-actor"}:${detail.organization.id}`}
+                    subjectType="venue"
+                    agreement={agreement}
+                    onChange={setContractSignature}
+                    showValidation={showContractValidation}
+                  />
+                  <Button type="button" disabled={!actorReady || signingContract || agreement.loading || agreement.error} onClick={() => void signOrganizationContract()}>
+                    {signingContract ? <Loader2 className="h-4 w-4 animate-spin" /> : "Semnează contractul organizației"}
+                  </Button>
+                </div>
+              )}
               {detail.organization.capabilities?.manageVenues === true && (
                 <Link href={`/dashboard/venue-onboarding?organizationId=${detail.organization.id}&intent=create`} className="inline-flex h-7 items-center rounded-lg bg-gold px-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark">
                   Adaugă local

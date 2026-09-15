@@ -546,6 +546,12 @@ WHERE status = 'dead_letter'
     OR lease_token IS NOT NULL
   );
 
+-- The 0030 status CHECK does not yet include 'cancelled'. Replace it inside
+-- this migration transaction before cancelling unsendable legacy rows; the
+-- canonical CHECK is installed below before commit.
+ALTER TABLE public.legal_contract_delivery_outbox
+  DROP CONSTRAINT IF EXISTS legal_contract_delivery_status_chk;
+
 -- Fail closed for legacy pending rows whose account, address, role, or signer
 -- binding is no longer live. Use an opaque row-local key after minimization.
 UPDATE public.legal_contract_delivery_outbox AS delivery
@@ -559,7 +565,8 @@ SET status = 'cancelled',
     dead_lettered_at = NULL,
     last_error = NULL,
     updated_at = now()
-WHERE delivery.delivered_at IS NULL
+WHERE delivery.status IN ('pending', 'failed', 'processing')
+  AND delivery.delivered_at IS NULL
   AND (
     -- No contract, including an administrator copy, remains sendable after
     -- the session signer has been erased.

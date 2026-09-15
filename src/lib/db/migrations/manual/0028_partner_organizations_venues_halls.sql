@@ -702,44 +702,11 @@ BEGIN
     default_hall_id := NULL; default_set_id := NULL;
   END LOOP;
 
-  -- 12f. Link one canonical acceptance per organization/document/version.
-  -- Other immutable signatures remain as legacy evidence with organization_id
-  -- NULL instead of being deleted, modified or causing a uniqueness failure.
-  WITH single_owner_orgs AS (
-    SELECT m.user_id, min(m.organization_id) AS organization_id
-    FROM partner_organization_members m
-    JOIN partner_organizations o ON o.id = m.organization_id
-    WHERE m.role = 'owner' AND m.is_active AND o.status = 'active'
-    GROUP BY m.user_id
-    HAVING count(DISTINCT m.organization_id) = 1
-  ), mapped AS (
-    SELECT la.id, vn.organization_id, la.document_slug, la.document_version, la.accepted_at
-    FROM legal_acceptances la
-    JOIN venues vn ON vn.id = la.venue_id
-    WHERE la.subject_type = 'venue' AND la.organization_id IS NULL
-      AND vn.organization_id IS NOT NULL
-    UNION
-    SELECT la.id, so.organization_id, la.document_slug, la.document_version, la.accepted_at
-    FROM legal_acceptances la
-    JOIN single_owner_orgs so ON so.user_id = la.user_id
-    WHERE la.subject_type = 'venue' AND la.organization_id IS NULL
-      AND la.venue_id IS NULL
-  ), ranked AS (
-    SELECT mapped.*,
-      row_number() OVER (
-        PARTITION BY organization_id, document_slug, document_version
-        ORDER BY accepted_at DESC, id DESC
-      ) AS rn
-    FROM mapped
-    WHERE NOT EXISTS (
-      SELECT 1 FROM legal_acceptances existing
-      WHERE existing.organization_id = mapped.organization_id
-        AND existing.document_slug = mapped.document_slug
-        AND existing.document_version = mapped.document_version
-    )
-  )
-  UPDATE legal_acceptances la SET organization_id = ranked.organization_id
-  FROM ranked WHERE ranked.id = la.id AND ranked.rn = 1;
+  -- 12f. Keep historical venue signatures in their original legal scope.
+  -- A venue acceptance does not prove that the owner accepted a contract for
+  -- the newly created organization. The evidence is append-only, so do not
+  -- relabel it or clear venue_id. The organization owner must explicitly sign
+  -- the organization contract in onboarding before creating a new venue.
 
   -- 12g. Legacy non-booking calendar blocks → whole-venue schedule blocks.
   --      Includes BOTH 'blocked' and manual 'booked' rows, but ONLY explicit

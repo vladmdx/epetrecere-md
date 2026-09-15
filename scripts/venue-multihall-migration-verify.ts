@@ -230,8 +230,8 @@ async function main() {
   if (!venueBackfill.organization_id) failures.push("owned venue was not linked to an organization");
   if (venueBackfill.default_halls !== 1) failures.push(`default_halls=${venueBackfill.default_halls}`);
   if (venueBackfill.owner_memberships !== 1) failures.push(`owner_memberships=${venueBackfill.owner_memberships}`);
-  if (evidenceBackfill.linked !== 1 || evidenceBackfill.unlinked !== 1) {
-    failures.push(`ambiguous legal mapping incorrect: ${JSON.stringify(evidenceBackfill)}`);
+  if (evidenceBackfill.linked !== 0 || evidenceBackfill.unlinked !== 2) {
+    failures.push(`legacy legal evidence was re-scoped: ${JSON.stringify(evidenceBackfill)}`);
   }
   if (evidenceBackfill.unchanged !== 2) failures.push("fixture signature/hash evidence changed");
   if (!commissionBackfill.hall_id || !commissionBackfill.hall_name_snapshot || !commissionBackfill.venue_name_snapshot) {

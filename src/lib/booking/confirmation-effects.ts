@@ -299,7 +299,7 @@ async function beginPreparationStep(
       AND ${bookingEffectOutbox.status} = 'processing'
       AND ${bookingEffectOutbox.leaseToken} = ${effect.leaseToken}
       AND ${statusColumn} IN ('pending', 'failed')
-      AND ${dueColumn} <= ${now}
+      AND ${dueColumn} <= ${now.toISOString()}::timestamptz
     `)
     .returning({ attempts: attemptsColumn });
   return started?.attempts ?? null;

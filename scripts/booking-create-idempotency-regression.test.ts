@@ -10,6 +10,8 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import {
   artists,
+  bookingEffectDeliveries,
+  bookingEffectOutbox,
   bookingRequests,
   categories,
   eventPlans,
@@ -44,6 +46,7 @@ const clientIdentity = {
   phone: "+37369000123",
   email: `${mark}@example.invalid`,
 };
+const bookingContactPhone = "+37369000234";
 const priorMultiHall = process.env.FEATURE_MULTI_HALL;
 
 const ids = {
@@ -62,7 +65,7 @@ function booking(
   return {
     ...target,
     clientName: "Submitted name is replaced",
-    clientPhone: "+37369999999",
+    clientPhone: bookingContactPhone,
     clientEmail: "submitted@example.invalid",
     eventDate,
     startTime: "18:00",
@@ -518,11 +521,18 @@ after(async () => {
       .from(bookingRequests)
       .where(eq(bookingRequests.clientUserId, ids.user));
     if (rows.length > 0) {
+      const bookingIds = rows.map((row) => row.id);
+      const effects = await db
+        .select({ id: bookingEffectOutbox.id })
+        .from(bookingEffectOutbox)
+        .where(inArray(bookingEffectOutbox.bookingId, bookingIds));
+      const effectIds = effects.map((row) => row.id);
+      if (effectIds.length > 0) {
+        await db.delete(bookingEffectDeliveries).where(inArray(bookingEffectDeliveries.effectId, effectIds));
+        await db.delete(bookingEffectOutbox).where(inArray(bookingEffectOutbox.id, effectIds));
+      }
       await db.delete(bookingRequests).where(
-        inArray(
-          bookingRequests.id,
-          rows.map((row) => row.id),
-        ),
+        inArray(bookingRequests.id, bookingIds),
       );
     }
   }
@@ -551,7 +561,7 @@ test("same artist key replays one booking and one linked offer", async () => {
   assert.equal(replay.created, false);
   assert.equal(replay.booking.id, first.booking.id);
   assert.equal(first.booking.clientName, clientIdentity.name);
-  assert.equal(first.booking.clientPhone, clientIdentity.phone);
+  assert.equal(first.booking.clientPhone, bookingContactPhone);
   assert.equal(first.booking.clientEmail, clientIdentity.email);
 
   const projections = await db
@@ -582,7 +592,7 @@ test("authenticated retry survives later server-managed profile edits", async ()
     assert.equal(replay.created, false);
     assert.equal(replay.booking.id, first.booking.id);
     assert.equal(replay.booking.clientName, clientIdentity.name);
-    assert.equal(replay.booking.clientPhone, clientIdentity.phone);
+    assert.equal(replay.booking.clientPhone, bookingContactPhone);
     assert.equal(replay.booking.clientEmail, clientIdentity.email);
   } finally {
     await db
@@ -849,7 +859,7 @@ test("an exact old request replays before today's create-only policy", async () 
   const canonical = {
     ...data,
     clientName: clientIdentity.name,
-    clientPhone: clientIdentity.phone,
+    clientPhone: bookingContactPhone,
     clientEmail: clientIdentity.email,
   };
   const payloadHash = bookingCreationPayloadHash(

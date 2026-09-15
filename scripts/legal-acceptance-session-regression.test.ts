@@ -7,7 +7,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
@@ -572,7 +572,11 @@ test("a partial recipient failure retries only that recipient", async () => {
   const [anchor] = await db
     .select()
     .from(legalAcceptances)
-    .where(eq(legalAcceptances.organizationId, ids.org))
+    .where(and(
+      eq(legalAcceptances.organizationId, ids.org),
+      eq(legalAcceptances.packVersion, LEGAL_PACK_VERSION),
+      isNotNull(legalAcceptances.email),
+    ))
     .limit(1);
   assert.ok(anchor);
   const now0 = new Date("2026-09-13T09:00:00.000Z");

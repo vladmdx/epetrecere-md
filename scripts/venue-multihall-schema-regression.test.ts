@@ -265,7 +265,9 @@ test("conversations.artist_id is nullable with a vendor-required check", () => {
 test("legal evidence uniqueness is session-scoped and delivery is durable", () => {
   const source = readFileSync("src/lib/db/schema.ts", "utf8");
   const acceptanceStart = source.indexOf("export const legalAcceptances");
-  const acceptanceSlice = source.slice(acceptanceStart, acceptanceStart + 6800);
+  const deliveryEnd = source.indexOf("export const accountBlobAssets", acceptanceStart);
+  assert.ok(acceptanceStart > 0 && deliveryEnd > acceptanceStart);
+  const acceptanceSlice = source.slice(acceptanceStart, deliveryEnd);
   assert.match(
     acceptanceSlice,
     /legal_acceptances_unique[\s\S]*acceptanceSessionId[\s\S]*documentSlug/,
@@ -281,7 +283,8 @@ test("legal evidence uniqueness is session-scoped and delivery is durable", () =
   assert.match(acceptanceSlice, /acceptanceSessionId: uuid\("acceptance_session_id"\)\.notNull\(\)/);
   assert.match(acceptanceSlice, /legal_contract_delivery_recipient_unique/);
   assert.match(acceptanceSlice, /recipientKey: text\("recipient_key"\)\.notNull\(\)/);
-  assert.match(acceptanceSlice, /recipientEmail: text\("recipient_email"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /recipientEmail: text\("recipient_email"\)/);
+  assert.doesNotMatch(acceptanceSlice, /recipientEmail: text\("recipient_email"\)\.notNull\(\)/);
   assert.match(acceptanceSlice, /nextAttemptAt: timestamp\("next_attempt_at"/);
   assert.match(acceptanceSlice, /deadLetteredAt: timestamp\("dead_lettered_at"/);
   assert.match(acceptanceSlice, /leaseToken: uuid\("lease_token"\)/);

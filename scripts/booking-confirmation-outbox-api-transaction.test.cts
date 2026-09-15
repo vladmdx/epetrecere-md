@@ -92,6 +92,7 @@ async function main() {
           userId: artistUser.id,
           nameRo: "Artist API transaction rollback",
           slug: `${marker}-artist`,
+          isActive: true,
         })
         .returning({ id: schema.artists.id });
       const [booking] = await tx
@@ -191,7 +192,10 @@ async function main() {
           FOR EACH ROW EXECUTE FUNCTION "${functionName}"()
         `));
 
-        await assert.rejects(invokeRoute, /forced_booking_outbox_failure/);
+        await assert.rejects(invokeRoute, (error) => {
+          assert.match(String(error?.cause ?? error), /forced_booking_outbox_failure/);
+          return true;
+        });
 
         const [afterFailedInsert] = await tx
           .select({ status: schema.bookingRequests.status })

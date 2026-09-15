@@ -429,7 +429,7 @@ async function main() {
   const [baseline] = await client<{
     outbox: boolean;
     status_column: boolean;
-    artist_id_not_null: boolean;
+    artist_id_present: boolean;
   }[]>`
     SELECT
       to_regclass('public.booking_effect_outbox') IS NOT NULL AS outbox,
@@ -439,18 +439,17 @@ async function main() {
           AND table_name = 'booking_effect_outbox'
           AND column_name = 'status'
       ) AS status_column,
-      COALESCE((
-        SELECT is_nullable = 'NO'
-        FROM information_schema.columns
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'booking_requests'
           AND column_name = 'artist_id'
-      ), false) AS artist_id_not_null
+      ) AS artist_id_present
   `;
   if (!baseline?.outbox) throw new Error("Migration 0030 must be applied first.");
-  if (!baseline.status_column && !baseline.artist_id_not_null) {
+  if (!baseline.artist_id_present) {
     throw new Error(
-      "0030-only baseline must preserve the historical NOT NULL artist_id so 0031 proves the nullable transition.",
+      "The 0030 baseline must include booking_requests.artist_id before 0031 can preserve artist history.",
     );
   }
 

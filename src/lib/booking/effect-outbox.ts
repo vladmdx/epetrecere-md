@@ -967,7 +967,7 @@ export async function reconcileOrphanedCancelledBookingEffectDeliveries(
       nextAttemptAt: now,
       leaseToken: null,
       leaseUntil: null,
-      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now.toISOString()}::timestamptz)`,
       lastError: sql`COALESCE(${bookingEffectDeliveries.lastError}, 'booking_cancelled_reconciled')`,
       deliveredAt: null,
       updatedAt: now,
@@ -1065,7 +1065,7 @@ export async function scrubBookingEffectsForClientErasure(
         nextAttemptAt: now,
         leaseToken: null,
         leaseUntil: null,
-        cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+        cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now.toISOString()}::timestamptz)`,
         lastError: "personal_data_erased",
         deliveredAt: sql`CASE
           WHEN ${bookingEffectDeliveries.status} = 'delivered'
@@ -1165,7 +1165,7 @@ export async function scrubBookingEffectRecipientForErasure(
       nextAttemptAt: now,
       leaseToken: null,
       leaseUntil: null,
-      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now.toISOString()}::timestamptz)`,
       lastError: "recipient_personal_data_erased",
       deliveredAt: sql`CASE
         WHEN ${bookingEffectDeliveries.status} = 'delivered'
@@ -1281,7 +1281,7 @@ export async function acknowledgeBookingEffectDeadLetter(
   const [resolved] = await db
     .update(bookingEffectOutbox)
     .set({
-      alertedAt: sql`COALESCE(${bookingEffectOutbox.alertedAt}, ${now})`,
+      alertedAt: sql`COALESCE(${bookingEffectOutbox.alertedAt}, ${now.toISOString()}::timestamptz)`,
       resolvedAt: now,
       resolutionNote: note.slice(0, 2_000),
       updatedAt: now,

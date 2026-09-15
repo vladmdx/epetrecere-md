@@ -529,7 +529,11 @@ describe("atomic venue-image reorder", { concurrency: false }, () => {
           { id: first.id, sortOrder: 1 },
           { id: failing.id, sortOrder: 2 },
         ]),
-        /forced_venue_image_reorder_failure/,
+        (error) => {
+          const cause = error instanceof Error ? error.cause ?? error : error;
+          assert.match(String(cause), /forced_venue_image_reorder_failure/);
+          return true;
+        },
       );
     } finally {
       await dropUpdateTrigger();

@@ -225,7 +225,7 @@ async function main(): Promise<void> {
 
   async function relationExists(relationName: string): Promise<boolean> {
     const [row] = await sql<{ exists: boolean }[]>`
-      SELECT to_regclass(format('public.%I', ${relationName})) IS NOT NULL
+      SELECT to_regclass(format('public.%I', ${relationName}::text)) IS NOT NULL
         AS exists
     `;
     return row?.exists === true;
@@ -746,7 +746,9 @@ async function main(): Promise<void> {
             JSON.stringify(expected.columns)) ||
         constraint.expression !== expected.expression ||
         !constraint.valid ||
-        constraint.noInherit ||
+        // PostgreSQL marks a primary key NO INHERIT; only our CHECKs must
+        // remain inheritable to protect child relations as well.
+        (constraint.constraintType === "c" && constraint.noInherit) ||
         constraint.deferrable ||
         constraint.deferred ||
         !constraint.local ||

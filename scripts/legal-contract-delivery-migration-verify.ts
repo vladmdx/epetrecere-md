@@ -97,7 +97,7 @@ async function main(): Promise<void> {
 
   async function relationExists(relationName: string): Promise<boolean> {
     const [row] = await sql<{ exists: boolean }[]>`
-      SELECT to_regclass(format('public.%I', ${relationName})) IS NOT NULL AS exists
+      SELECT to_regclass(format('public.%I', ${relationName}::text)) IS NOT NULL AS exists
     `;
     return row?.exists === true;
   }

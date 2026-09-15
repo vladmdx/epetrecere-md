@@ -112,8 +112,10 @@ test("kill-switch is wired into transactional org/hall mutation services", () =>
   assert.match(imageById, /updateVenueImage\(actor\.id/);
   assert.match(imageById, /deleteVenueImage\(actor\.id/);
   const imageWrites = readFileSync("src/lib/partner/venue-image-writes.ts", "utf8");
-  assert.match(imageWrites, /hallImageFeatureFailure/);
-  assert.match(imageWrites, /isMultiHallEnabled\(\)/);
+  assert.match(imageWrites, /hallImageMutationFailure/);
+  assert.match(imageWrites, /HALL_IMAGES_USE_HALL_PATCH/);
+  const hallWrites = readFileSync("src/lib/partner/hall-writes.ts", "utf8");
+  assert.match(hallWrites, /if \(!isMultiHallEnabled\(\)\)/);
   const adminReg = readFileSync("src/app/api/admin/registration-requests/route.ts", "utf8");
   assert.match(adminReg, /jsonIfOrganizationBackedVenueDisabled/);
 

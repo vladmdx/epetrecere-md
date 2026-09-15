@@ -71,7 +71,7 @@ async function createBooking(status: "accepted" | "confirmed_by_client" = "confi
 
 function channelDrivers(overrides: {
   email?: () => Promise<unknown>;
-  push?: () => Promise<{ sent: number; pruned: number; failed: number }>;
+  push?: NonNullable<NotificationChannelDrivers["sendPushToUser"]>;
   whatsapp?: () => Promise<{ sent: boolean; reason?: string }>;
 } = {}): NotificationChannelDrivers {
   return {
@@ -525,10 +525,15 @@ test("a never-resolving provider releases the barrier by deadline for concurrent
   const worker = processConfirmationNotificationEffect(effect.id, {
     providerTimeoutMs: 25,
     drivers: channelDrivers({
-      push: async () => {
+      push: async (_userId, _payload, options) => {
         pushCalls += 1;
         signalStarted();
-        return new Promise(() => undefined);
+        return new Promise((_, reject) => {
+          const signal = options?.signal;
+          if (!signal) return reject(new Error("abort signal missing"));
+          if (signal.aborted) return reject(signal.reason);
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        });
       },
     }),
   });
@@ -874,7 +879,13 @@ test("cron auth, Inngest recovery and API confirmation wiring stay active", asyn
       "http://localhost/api/cron/booking-confirmation-outbox",
       { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } },
     ));
-    assert.equal(quiet.status, 200, "reported historical dead letter no longer poisons cron");
+    const quietHealth = await quiet.json() as {
+      failedBacklog: number;
+      newlyReportedTerminal: number;
+    };
+    assert.equal(quietHealth.newlyReportedTerminal, 0, "historical dead letter is reported only once");
+    assert.ok(quietHealth.failedBacklog >= 1, "the intentionally retryable fixture still needs attention");
+    assert.equal(quiet.status, 503, "a separate retry backlog correctly keeps cron unhealthy");
   } finally {
     if (previous === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = previous;

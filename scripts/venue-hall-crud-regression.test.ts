@@ -202,7 +202,7 @@ describe("transactional Hall CRUD", { concurrency: false }, () => {
         nameRo: "Sala cu copii",
         imageUrls: ["https://example.com/a.jpg", "https://example.com/b.jpg"],
         seating: [
-          { type: "theater", capacityMin: 20, capacityMax: 100 },
+          { type: "theatre", capacityMin: 20, capacityMax: 100 },
           { type: "banquet", capacityMin: 10, capacityMax: 80 },
         ],
         inheritMenu: false,
