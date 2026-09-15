@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artists, venues, users, categories, venueImages, artistPackages, legalAcceptances, partnerOrganizations, venueHalls } from "@/lib/db/schema";
-import { eq, and, sql, inArray, asc, desc, count } from "drizzle-orm";
+import { eq, and, sql, inArray, asc, desc, count, isNull } from "drizzle-orm";
 import { attachRegistrationVenueAudit } from "@/lib/admin/registration-queue";
 import { mapAdminOrganizationSummary } from "@/lib/admin/organization-summary";
 import { sendEmail } from "@/lib/email/send";
@@ -77,7 +77,7 @@ export async function GET() {
           sortOrder: venueImages.sortOrder,
         })
         .from(venueImages)
-        .where(inArray(venueImages.venueId, venueIds))
+        .where(and(inArray(venueImages.venueId, venueIds), isNull(venueImages.hallId)))
         .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
     : [];
   const venueCoverMap = new Map<number, string>();

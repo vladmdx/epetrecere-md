@@ -17,7 +17,7 @@ import { getLegalDocument } from "@/lib/legal";
 import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { Download, ShieldCheck } from "lucide-react";
-import { groupAdminContractSessions } from "@/lib/admin/contract-sessions";
+import { groupAdminContractSessions, uniqueAdminContractSessionIds } from "@/lib/admin/contract-sessions";
 import { mapAdminOrganizationSummary } from "@/lib/admin/organization-summary";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,16 @@ export default async function AdminContractsPage({
   const admin = await requireAdmin();
   if (!admin.ok) redirect("/");
 
-  const rows = await db
+  // Select recent sessions first, then load *every* accepted document in each
+  // selected session. A 500-row cut through one session would be misleading.
+  const recentRows = await db
+    .select({ acceptanceSessionId: legalAcceptances.acceptanceSessionId })
+    .from(legalAcceptances)
+    .orderBy(desc(legalAcceptances.acceptedAt), desc(legalAcceptances.id))
+    .limit(500);
+  const recentSessionIds = uniqueAdminContractSessionIds(recentRows);
+
+  const rows = recentSessionIds.length ? await db
     .select({
       id: legalAcceptances.id,
       userId: legalAcceptances.userId,
@@ -67,8 +76,9 @@ export default async function AdminContractsPage({
     })
     .from(legalAcceptances)
     .leftJoin(users, eq(users.id, legalAcceptances.userId))
-    .orderBy(desc(legalAcceptances.acceptedAt))
-    .limit(500);
+    .where(inArray(legalAcceptances.acceptanceSessionId, recentSessionIds))
+    .orderBy(desc(legalAcceptances.acceptedAt), desc(legalAcceptances.id))
+    : [];
 
   // Naming the partner takes two paths, because signing happens BEFORE the
   // vendor profile exists: newer rows carry artist_id / venue_id (backfilled

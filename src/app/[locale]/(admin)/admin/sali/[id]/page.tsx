@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
+import { adminHallPriceText, adminVenueStatusText } from "@/lib/admin/venue-display";
 
 const RichEditor = dynamic(
   () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
@@ -51,6 +52,7 @@ interface VenueData {
   menuPdfUrl: string | null;
   virtualTourUrl: string | null;
   isActive: boolean;
+  publicHref: string | null;
   isFeatured: boolean;
   ratingAvg: number | null;
   ratingCount: number | null;
@@ -243,12 +245,14 @@ export default function AdminEditVenuePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/sali/${venue.slug}`} target="_blank" rel="noopener">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Eye className="h-4 w-4" />
-              {t("admin.venueEdit.viewPublic")}
-            </Button>
-          </Link>
+          {venue.publicHref ? (
+            <Link href={venue.publicHref} target="_blank" rel="noopener">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Eye className="h-4 w-4" />
+                {t("admin.venueEdit.viewPublic")}
+              </Button>
+            </Link>
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -321,7 +325,7 @@ export default function AdminEditVenuePage() {
             <>
               <p className="font-medium">{organization.legalName || organization.displayName}</p>
               <p className="text-xs text-muted-foreground">
-                {t("adminUi.venues.organizationId", { id: organization.id })} · {organization.type} · {organization.status}
+                {t("adminUi.venues.organizationId", { id: organization.id })} · {organization.type} · {adminVenueStatusText(organization.status, t)}
               </p>
             </>
           ) : (
@@ -345,13 +349,12 @@ export default function AdminEditVenuePage() {
                     <div>
                       <p className="font-medium">{hall.nameRo}</p>
                       <p className="text-xs text-muted-foreground">
-                        {t("adminUi.venues.hallStatus")}: {hall.status}
+                        {t("adminUi.venues.hallStatus")}: {adminVenueStatusText(hall.status, t)}
                         {hall.isLegacyDefault ? ` · ${t("adminUi.venues.legacyDefault")}` : ""}
                         {` · ${t("adminUi.venues.hallPhotos", { count: hall.photoCount })}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {hall.capacityMin ?? "—"}–{hall.capacityMax ?? "—"} · {hall.pricingModel}
-                        {hall.basePrice != null ? ` · ${hall.basePrice} ${hall.currency}` : ""}
+                        {hall.capacityMin ?? "—"}–{hall.capacityMax ?? "—"} · {adminHallPriceText(hall, t)}
                       </p>
                     </div>
                     {hall.publicHref ? (

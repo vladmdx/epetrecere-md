@@ -9,9 +9,12 @@ import {
   mapAdminVenueListItems,
   parseAdminVenueListQuery,
   ADMIN_VENUE_LIST_MAX_LIMIT,
+  ADMIN_VENUE_LIST_MAX_OFFSET,
 } from "../src/lib/admin/venue-list";
+import { adminHallPriceText, adminKnownPriceText, adminVenueStatusText } from "../src/lib/admin/venue-display";
 import {
   adminPublicHallHref,
+  adminVenuePublicHref,
   mapAdminGeneralImages,
   mapAdminVenueHalls,
 } from "../src/lib/admin/venue-detail";
@@ -19,6 +22,7 @@ import { attachRegistrationVenueAudit } from "../src/lib/admin/registration-queu
 import {
   groupAdminContractSessions,
   resolveAdminContractHolder,
+  uniqueAdminContractSessionIds,
 } from "../src/lib/admin/contract-sessions";
 
 function withFlag(on: boolean, fn: () => void) {
@@ -54,6 +58,8 @@ test("admin venue list query validates page, limit, search and status", () => {
   });
   assert.equal(parseAdminVenueListQuery(new URLSearchParams("page=0")).ok, false);
   assert.equal(parseAdminVenueListQuery(new URLSearchParams("page=1.5")).ok, false);
+  assert.equal(parseAdminVenueListQuery(new URLSearchParams(`page=${Number.MAX_SAFE_INTEGER}`)).ok, false);
+  assert.equal(parseAdminVenueListQuery(new URLSearchParams(`page=${Math.floor(ADMIN_VENUE_LIST_MAX_OFFSET / 20) + 2}`)).ok, false);
   assert.equal(parseAdminVenueListQuery(new URLSearchParams(`limit=${ADMIN_VENUE_LIST_MAX_LIMIT + 1}`)).ok, false);
   assert.equal(parseAdminVenueListQuery(new URLSearchParams("status=nope")).ok, false);
   assert.equal(parseAdminVenueListQuery(new URLSearchParams("status=published")).ok, true);
@@ -178,7 +184,7 @@ test("list mapping keeps venues without org or halls and does not duplicate org 
   assert.equal(items[2]!.halls.total, 1);
   assert.equal(items[1]!.halls.byStatus.active, 1);
   assert.equal(items[1]!.halls.byStatus.draft, 1);
-  assert.deepEqual(items[1]!.halls.minPrice, { amount: 25, currency: "EUR", model: "per_person" });
+  assert.deepEqual(items[1]!.halls.minPrice, { amount: 30, currency: "EUR", model: "per_person" });
   assert.equal(items[2]!.halls.minPrice, null);
   assert.equal(forbiddenAdminDtoKeys(items).length, 0);
 });
@@ -202,11 +208,27 @@ test("min hall price is omitted for quote, missing amounts and mixed models", ()
   );
 });
 
+test("admin prices keep currency and model, including minimum order and quote", () => {
+  const t = (key: string) => ({
+    "adminUi.venues.pricePerPersonModel": "per person",
+    "adminUi.venues.priceFixedModel": "fixed",
+    "adminUi.venues.priceMinimumOrderModel": "minimum order",
+    "adminUi.venues.priceQuoteModel": "on request",
+    "adminUi.venues.priceUnknown": "not specified",
+    "adminUi.venues.statusPending": "pending",
+  } as Record<string, string>)[key] ?? key;
+  assert.equal(adminHallPriceText({ pricingModel: "minimum_order", basePrice: null, minimumOrder: 900, currency: "MDL" }, t), "900 MDL · minimum order");
+  assert.equal(adminHallPriceText({ pricingModel: "quote", basePrice: null, minimumOrder: null, currency: "EUR" }, t), "on request");
+  assert.equal(adminKnownPriceText({ amount: 20, currency: "USD", model: "per_person" }, t), "20 USD · per person");
+  assert.equal(adminVenueStatusText("new-status", t), "new-status");
+});
+
 test("halls from another venue cannot appear in the current venue projection", () => {
   const halls = mapAdminVenueHalls({
     venueId: 1,
     venueSlug: "one",
     venueIsActive: true,
+    organizationId: null,
     organizationStatus: "active",
     halls: [
       {
@@ -267,24 +289,30 @@ test("halls from another venue cannot appear in the current venue projection", (
 
 test("public hall href stays on the existing public route and respects the feature flag", () => {
   withFlag(false, () => {
+    assert.equal(adminVenuePublicHref({ venueSlug: "grand", venueIsActive: true, organizationId: 1, organizationStatus: "pending", activeHallCount: 0 }), "/sali/grand");
     assert.equal(
       adminPublicHallHref({
         venueSlug: "grand",
         hallSlug: "ballroom",
         hallStatus: "active",
         venueIsActive: true,
+        organizationId: 1,
         organizationStatus: "pending",
       }),
-      "/sali/grand?hall=ballroom",
+      null,
     );
   });
   withFlag(true, () => {
+    assert.equal(adminVenuePublicHref({ venueSlug: "grand", venueIsActive: true, organizationId: 1, organizationStatus: "pending", activeHallCount: 1 }), null);
+    assert.equal(adminVenuePublicHref({ venueSlug: "grand", venueIsActive: true, organizationId: 1, organizationStatus: "active", activeHallCount: 0 }), null);
+    assert.equal(adminVenuePublicHref({ venueSlug: "grand", venueIsActive: true, organizationId: 1, organizationStatus: "active", activeHallCount: 1 }), "/sali/grand");
     assert.equal(
       adminPublicHallHref({
         venueSlug: "grand",
         hallSlug: "ballroom",
         hallStatus: "active",
         venueIsActive: true,
+        organizationId: 1,
         organizationStatus: "pending",
       }),
       null,
@@ -295,9 +323,32 @@ test("public hall href stays on the existing public route and respects the featu
         hallSlug: "ballroom",
         hallStatus: "draft",
         venueIsActive: true,
+        organizationId: 1,
         organizationStatus: "active",
       }),
       null,
+    );
+    assert.equal(
+      adminPublicHallHref({
+        venueSlug: "grand",
+        hallSlug: "ballroom",
+        hallStatus: "active",
+        venueIsActive: true,
+        organizationId: 1,
+        organizationStatus: null,
+      }),
+      null,
+    );
+    assert.equal(
+      adminPublicHallHref({
+        venueSlug: "grand",
+        hallSlug: "ballroom",
+        hallStatus: "active",
+        venueIsActive: true,
+        organizationId: 1,
+        organizationStatus: "active",
+      }),
+      "/sali/grand?hall=ballroom",
     );
   });
 });
@@ -395,6 +446,23 @@ test("contracts of two orgs signed by the same user stay isolated by session", (
     "One SRL",
   );
   assert.notEqual(resolveAdminContractHolder(rows[0]!, maps).name, "Wrong venue from user map");
+});
+
+test("recent-row boundary expands to complete session IDs", () => {
+  const recent = [
+    { acceptanceSessionId: "s1" },
+    { acceptanceSessionId: "s1" },
+    { acceptanceSessionId: "s2" },
+  ];
+  assert.deepEqual(uniqueAdminContractSessionIds(recent), ["s1", "s2"]);
+  const all = [
+    doc(1, { acceptanceSessionId: "s1" }),
+    doc(2, { acceptanceSessionId: "s1" }),
+    doc(3, { acceptanceSessionId: "s1" }),
+    doc(4, { acceptanceSessionId: "s2" }),
+  ];
+  const expanded = all.filter((row) => uniqueAdminContractSessionIds(recent).includes(row.acceptanceSessionId));
+  assert.equal(expanded.length, 4);
 });
 
 test("legacy personal acceptances still resolve by user when organizationId is null", () => {

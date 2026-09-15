@@ -28,7 +28,7 @@ const orgs = [
 ];
 const halls = [
   hallRow(11, 1, { status: "active", sortOrder: 1, nameRo: "Ballroom" }),
-  hallRow(12, 1, { status: "draft", sortOrder: 2, nameRo: "Garden" }),
+  hallRow(12, 1, { status: "draft", sortOrder: 2, nameRo: "Garden", basePrice: 1 }),
   hallRow(21, 2, { status: "rejected", sortOrder: 0, nameRo: "Other venue hall" }),
 ];
 const images = [
@@ -85,7 +85,7 @@ function hallRow(id, venueId, overrides) {
     capacityMin: 10,
     capacityMax: 40,
     pricingModel: "per_person",
-    basePrice: 20,
+    basePrice: overrides.basePrice ?? 20,
     minimumOrder: null,
     currency: "EUR",
     depositType: "none",
@@ -105,8 +105,11 @@ function applyVenueFilters(rows, condition) {
   let next = rows.slice();
   if (/is_active/i.test(sql) && params.includes(true)) next = next.filter((row) => row.isActive);
   if (/is_active/i.test(sql) && params.includes(false)) next = next.filter((row) => !row.isActive);
-  if (/partner_organizations"?\."?status/i.test(sql) || (/status/i.test(sql) && params.includes("pending"))) {
-    next = next.filter((row) => orgs.find((org) => org.id === row.organizationId)?.status === "pending");
+  const orgStatus = params.find((value) =>
+    typeof value === "string" && ["draft", "pending", "active", "rejected", "suspended", "archived"].includes(value),
+  );
+  if (/partner_organizations"?\."?status/i.test(sql) && orgStatus) {
+    next = next.filter((row) => orgs.find((org) => org.id === row.organizationId)?.status === orgStatus);
   }
   const like = params.find((value) => typeof value === "string" && value.includes("%"));
   if (like) {
@@ -240,6 +243,8 @@ function listReq(suffix = "") {
 }
 
 (async () => {
+  const originalFeatureFlag = process.env.FEATURE_MULTI_HALL;
+  delete process.env.FEATURE_MULTI_HALL;
   try {
     const listApi = loadAfterMocks(path.join(root, "src/app/api/admin/venues/route.ts"));
     const detailApi = loadAfterMocks(path.join(root, "src/app/api/admin/venues/[id]/route.ts"));
@@ -262,6 +267,8 @@ function listReq(suffix = "") {
     assert.equal(response.status, 400);
     response = await listApi.GET(listReq("?limit=200"));
     assert.equal(response.status, 400);
+    response = await listApi.GET(listReq(`?page=${Number.MAX_SAFE_INTEGER}`));
+    assert.equal(response.status, 400);
 
     response = await listApi.GET(listReq("?page=1&limit=20"));
     assert.equal(response.status, 200);
@@ -276,10 +283,26 @@ function listReq(suffix = "") {
     assert.equal(body.items[0].organization.id, 9);
     assert.equal(body.items[1].organization.id, 9);
     assert.equal(body.items[2].organization, null);
+    assert.equal(body.items[0].publicHref, "/sali/alpha");
+    assert.equal(body.items[1].publicHref, null);
     assert.equal(body.items[2].halls.total, 0);
     assert.equal(body.items[0].halls.total, 2);
+    assert.deepEqual(body.items[0].halls.minPrice, { amount: 20, currency: "EUR", model: "per_person" });
     assert.equal(body.items[1].halls.total, 1);
     assert.equal(hasBank(body), false);
+
+    response = await listApi.GET(listReq("?status=published"));
+    assert.deepEqual((await response.json()).items.map((item) => item.nameRo), ["Alpha"]);
+    response = await listApi.GET(listReq("?status=unpublished"));
+    assert.deepEqual((await response.json()).items.map((item) => item.nameRo), ["Beta", "Gamma"]);
+    response = await listApi.GET(listReq("?status=pending"));
+    assert.deepEqual((await response.json()).items.map((item) => item.nameRo), ["Alpha", "Beta"]);
+    response = await listApi.GET(listReq("?status=active"));
+    assert.deepEqual((await response.json()).items.map((item) => item.nameRo), []);
+    orgs[0].status = "rejected";
+    response = await listApi.GET(listReq("?status=rejected"));
+    assert.deepEqual((await response.json()).items.map((item) => item.nameRo), ["Alpha", "Beta"]);
+    orgs[0].status = "pending";
 
     response = await listApi.GET(listReq("?page=1&limit=1"));
     const page1 = await response.json();
@@ -306,16 +329,40 @@ function listReq(suffix = "") {
     const detail = await response.json();
     assert.equal(detail.id, 1);
     assert.equal(detail.organization.legalName, "Acme SRL");
+    assert.equal(detail.publicHref, "/sali/alpha");
     assert.deepEqual(detail.halls.map((hall) => hall.id), [11, 12]);
     assert.ok(detail.halls.every((hall) => hall.id !== 21));
     assert.deepEqual(detail.images.map((image) => image.id), [100]);
     assert.equal(hasBank(detail), false);
     assert.equal(response.headers.get("Cache-Control"), "private, no-store");
 
+    const oldFlag = process.env.FEATURE_MULTI_HALL;
+    process.env.FEATURE_MULTI_HALL = "1";
+    try {
+      response = await listApi.GET(listReq());
+      const flaggedList = await response.json();
+      assert.equal(flaggedList.items[0].publicHref, null); // pending organization
+      response = await detailApi.GET(listReq("/1"), { params: Promise.resolve({ id: "1" }) });
+      assert.equal((await response.json()).halls[0].publicHref, null);
+      orgs[0].status = "active";
+      response = await listApi.GET(listReq());
+      assert.equal((await response.json()).items[0].publicHref, "/sali/alpha");
+      response = await detailApi.GET(listReq("/1"), { params: Promise.resolve({ id: "1" }) });
+      const flaggedDetail = await response.json();
+      assert.equal(flaggedDetail.halls[0].publicHref, "/sali/alpha?hall=ballroom");
+      assert.equal(flaggedDetail.halls[1].publicHref, null); // draft hall
+    } finally {
+      orgs[0].status = "pending";
+      if (oldFlag === undefined) delete process.env.FEATURE_MULTI_HALL;
+      else process.env.FEATURE_MULTI_HALL = oldFlag;
+    }
+
     console.log("phase6a2 admin venues route regression ok");
   } finally {
     Module._load = oldLoad;
     global.fetch = oldFetch;
+    if (originalFeatureFlag === undefined) delete process.env.FEATURE_MULTI_HALL;
+    else process.env.FEATURE_MULTI_HALL = originalFeatureFlag;
   }
 })().catch((error) => {
   console.error(error);

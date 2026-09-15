@@ -31,6 +31,12 @@ export type AdminContractNameMaps = {
   venueByUser: ReadonlyMap<string, string>;
 };
 
+export function uniqueAdminContractSessionIds(
+  rows: readonly { acceptanceSessionId: string }[],
+): string[] {
+  return [...new Set(rows.map((row) => row.acceptanceSessionId))];
+}
+
 export function compareSessionDocuments(
   a: { documentSlug: string; id: number },
   b: { documentSlug: string; id: number },

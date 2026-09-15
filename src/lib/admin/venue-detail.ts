@@ -68,24 +68,42 @@ export function isAdminHallPublishable(hall: {
   return true;
 }
 
+export function adminVenuePublicHref(input: {
+  venueSlug: string;
+  venueIsActive: boolean;
+  organizationId: number | null;
+  organizationStatus: string | null;
+  activeHallCount: number;
+}): string | null {
+  if (!input.venueSlug.trim() || !input.venueIsActive) return null;
+  if (isMultiHallEnabled()) {
+    if (input.organizationId != null && input.organizationStatus !== "active") return null;
+    if (input.activeHallCount < 1) return null;
+  }
+  return `/sali/${input.venueSlug}`;
+}
+
 export function adminPublicHallHref(input: {
   venueSlug: string;
   hallSlug: string;
   hallStatus: string;
   venueIsActive: boolean;
+  organizationId: number | null;
   organizationStatus: string | null;
 }): string | null {
+  // With the flag off, the public venue route has no selectable hall context.
+  if (!isMultiHallEnabled()) return null;
   if (!input.venueIsActive) return null;
   if (input.hallStatus !== "active") return null;
   if (!input.venueSlug.trim() || !input.hallSlug.trim()) return null;
-  if (
-    isMultiHallEnabled() &&
-    input.organizationStatus != null &&
-    input.organizationStatus !== "active"
-  ) {
-    return null;
-  }
-  return `/sali/${input.venueSlug}?hall=${encodeURIComponent(input.hallSlug)}`;
+  const venueHref = adminVenuePublicHref({
+    venueSlug: input.venueSlug,
+    venueIsActive: input.venueIsActive,
+    organizationId: input.organizationId,
+    organizationStatus: input.organizationStatus,
+    activeHallCount: 1,
+  });
+  return venueHref ? `${venueHref}?hall=${encodeURIComponent(input.hallSlug)}` : null;
 }
 
 function isoTimestamp(value: Date | string | null | undefined): string | null {
@@ -98,6 +116,7 @@ export function mapAdminVenueHalls(input: {
   venueId: number;
   venueSlug: string;
   venueIsActive: boolean;
+  organizationId: number | null;
   organizationStatus: string | null;
   halls: readonly AdminVenueHallSource[];
   photoCountByHallId: ReadonlyMap<number, number>;
@@ -130,6 +149,7 @@ export function mapAdminVenueHalls(input: {
         hallSlug: hall.slug,
         hallStatus: hall.status,
         venueIsActive: input.venueIsActive,
+        organizationId: input.organizationId,
         organizationStatus: input.organizationStatus,
       }),
     }));

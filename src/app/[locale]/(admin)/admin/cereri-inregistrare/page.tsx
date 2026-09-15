@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import Link from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
+import { adminHallPriceText, adminVenueStatusText } from "@/lib/admin/venue-display";
 
 interface RegistrationRequest {
   id: number;
@@ -59,6 +60,7 @@ interface RegistrationRequest {
     capacityMax: number | null;
     pricingModel: string;
     basePrice: number | null;
+    minimumOrder: number | null;
     currency: string;
     photoCount: number;
   }[];
@@ -272,7 +274,7 @@ export default function RegistrationRequestsPage() {
                               <p className="text-sm">
                                 {req.organization.legalName || req.organization.displayName}
                                 <span className="ml-2 text-xs text-muted-foreground">
-                                  {t("adminUi.registrations.organizationId", { id: req.organization.id })} · {req.organization.status}
+                                  {t("adminUi.registrations.organizationId", { id: req.organization.id })} · {adminVenueStatusText(req.organization.status, t)}
                                 </span>
                               </p>
                             ) : (
@@ -295,13 +297,13 @@ export default function RegistrationRequestsPage() {
                                   <li key={hall.id} className="text-xs text-muted-foreground">
                                     <span className="text-foreground">{hall.nameRo}</span>
                                     {" · "}
-                                    {t("adminUi.registrations.hallStatus")}: {hall.status}
+                                    {t("adminUi.registrations.hallStatus")}: {adminVenueStatusText(hall.status, t)}
                                     {hall.isLegacyDefault ? ` · ${t("adminUi.registrations.legacyDefault")}` : ""}
                                     {` · ${t("adminUi.registrations.hallPhotos", { count: hall.photoCount })}`}
                                     {hall.capacityMax != null || hall.capacityMin != null
                                       ? ` · ${hall.capacityMin ?? "—"}–${hall.capacityMax ?? "—"}`
                                       : ""}
-                                    {hall.basePrice != null ? ` · ${hall.basePrice} ${hall.currency}` : ""}
+                                    {` · ${adminHallPriceText(hall, t)}`}
                                   </li>
                                 ))}
                               </ul>

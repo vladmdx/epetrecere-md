@@ -3,10 +3,13 @@ import {
   mapAdminOrganizationSummary,
   type AdminOrganizationSummary,
 } from "./organization-summary";
+import { adminVenuePublicHref } from "./venue-detail";
 
 export const ADMIN_VENUE_LIST_DEFAULT_PAGE = 1;
 export const ADMIN_VENUE_LIST_DEFAULT_LIMIT = 20;
 export const ADMIN_VENUE_LIST_MAX_LIMIT = 50;
+// Keep OFFSET bounded for both Postgres and the administrator's browser.
+export const ADMIN_VENUE_LIST_MAX_OFFSET = 100_000;
 export const ADMIN_VENUE_SEARCH_MAX_LENGTH = 120;
 
 export const ADMIN_VENUE_STATUS_FILTERS = [
@@ -67,6 +70,7 @@ export type AdminVenueListItem = {
   pricePerPerson: number | null;
   organization: AdminOrganizationSummary | null;
   halls: AdminHallAggregate;
+  publicHref: string | null;
 };
 
 function finiteAmount(value: number | null | undefined): number | null {
@@ -96,6 +100,9 @@ export function parseAdminVenueListQuery(
   if (limit == null || limit > ADMIN_VENUE_LIST_MAX_LIMIT) {
     return { ok: false, error: "Invalid limit", status: 400 };
   }
+  if ((page - 1) * limit > ADMIN_VENUE_LIST_MAX_OFFSET) {
+    return { ok: false, error: "Invalid page", status: 400 };
+  }
 
   const qRaw = searchParams.get("q");
   let q: string | null = null;
@@ -120,7 +127,7 @@ export function parseAdminVenueListQuery(
   return { ok: true, page, limit, q, status };
 }
 
-function hallAdminAmount(hall: AdminHallPriceInput): AdminMinHallPrice | null {
+export function adminHallAmount(hall: AdminHallPriceInput): AdminMinHallPrice | null {
   const currency = (hall.currency ?? "EUR").trim().toUpperCase();
   if (!currency) return null;
   const model = hall.pricingModel;
@@ -144,7 +151,7 @@ export function adminMinHallPrice(
   halls: readonly AdminHallPriceInput[],
 ): AdminMinHallPrice | null {
   const priced = halls
-    .map(hallAdminAmount)
+    .map(adminHallAmount)
     .filter((row): row is AdminMinHallPrice => row != null);
   if (priced.length === 0) return null;
   const models = new Set(priced.map((row) => row.model));
@@ -188,7 +195,8 @@ export function aggregateAdminHalls(
     total: counts.total,
     byStatus: counts.byStatus,
     maxCapacity: adminMaxHallCapacity(halls),
-    minPrice: adminMinHallPrice(halls),
+    // A draft/rejected hall must not lower the apparent price of published halls.
+    minPrice: adminMinHallPrice(halls.filter((hall) => hall.status === "active")),
   };
 }
 
@@ -250,6 +258,7 @@ export function mapAdminVenueListItems(
             status: row.orgStatus ?? "",
           })
         : null;
+    const aggregate = aggregateAdminHalls(hallsByVenue.get(row.id) ?? []);
     return {
       id: row.id,
       nameRo: row.nameRo,
@@ -264,7 +273,14 @@ export function mapAdminVenueListItems(
       capacityMax: row.capacityMax,
       pricePerPerson: row.pricePerPerson,
       organization,
-      halls: aggregateAdminHalls(hallsByVenue.get(row.id) ?? []),
+      halls: aggregate,
+      publicHref: adminVenuePublicHref({
+        venueSlug: row.slug,
+        venueIsActive: row.isActive,
+        organizationId: row.organizationId,
+        organizationStatus: organization?.status ?? null,
+        activeHallCount: aggregate.byStatus.active ?? 0,
+      }),
     };
   });
 }

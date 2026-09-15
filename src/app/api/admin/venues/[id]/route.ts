@@ -9,6 +9,7 @@ import {
   mapAdminGeneralImages,
   mapAdminOrganizationForVenue,
   mapAdminVenueHalls,
+  adminVenuePublicHref,
 } from "@/lib/admin/venue-detail";
 
 export async function GET(
@@ -156,10 +157,18 @@ export async function GET(
     {
       ...venueFields,
       organization: mapAdminOrganizationForVenue(organizationId, orgRow),
+      publicHref: adminVenuePublicHref({
+        venueSlug: venue.slug,
+        venueIsActive: venue.isActive,
+        organizationId,
+        organizationStatus: orgRow?.status ?? null,
+        activeHallCount: hallRows.filter((hall) => hall.status === "active").length,
+      }),
       halls: mapAdminVenueHalls({
         venueId: venue.id,
         venueSlug: venue.slug,
         venueIsActive: venue.isActive,
+        organizationId,
         organizationStatus: orgRow?.status ?? null,
         halls: hallRows,
         photoCountByHallId,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { useLocale } from "@/hooks/use-locale";
 import type { AdminOrganizationSummary } from "@/lib/admin/organization-summary";
 import type { AdminHallAggregate, AdminVenueStatusFilter } from "@/lib/admin/venue-list";
 import { ADMIN_VENUE_LIST_DEFAULT_LIMIT, ADMIN_VENUE_STATUS_FILTERS } from "@/lib/admin/venue-list";
+import { ADMIN_VENUE_STATUS_I18N, adminKnownPriceText, adminVenueStatusText } from "@/lib/admin/venue-display";
 
 interface AdminVenueListItem {
   id: number;
@@ -26,18 +27,8 @@ interface AdminVenueListItem {
   ratingAvg: number | null;
   organization: AdminOrganizationSummary | null;
   halls: AdminHallAggregate;
+  publicHref: string | null;
 }
-
-const STATUS_I18N: Record<string, string> = {
-  published: "adminUi.venues.statusPublished",
-  unpublished: "adminUi.venues.statusUnpublished",
-  draft: "adminUi.venues.statusDraft",
-  pending: "adminUi.venues.statusPending",
-  active: "adminUi.venues.statusActive",
-  rejected: "adminUi.venues.statusRejected",
-  suspended: "adminUi.venues.statusSuspended",
-  archived: "adminUi.venues.statusArchived",
-};
 
 export default function AdminVenuesPage() {
   const { t } = useLocale();
@@ -50,28 +41,40 @@ export default function AdminVenuesPage() {
   const [status, setStatus] = useState<"" | AdminVenueStatusFilter>("");
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const requestId = useRef(0);
 
-  const loadPage = useCallback(async (nextPage: number, nextQ: string, nextStatus: string) => {
+  const loadPage = useCallback(async (nextPage: number, nextQ: string, nextStatus: string, signal?: AbortSignal) => {
+    const currentRequest = ++requestId.current;
     const params = new URLSearchParams({
       page: String(nextPage),
       limit: String(limit),
     });
     if (nextQ) params.set("q", nextQ);
     if (nextStatus) params.set("status", nextStatus);
-    const res = await fetch(`/api/admin/venues?${params.toString()}`);
+    const res = await fetch(`/api/admin/venues?${params.toString()}`, { signal });
     if (!res.ok) throw new Error("fetch failed");
     const data = await res.json();
+    if (signal?.aborted || currentRequest !== requestId.current) return;
     const items = Array.isArray(data.items) ? data.items : [];
+    const nextTotal = typeof data.total === "number" ? data.total : items.length;
+    const lastPage = Math.max(1, Math.ceil(nextTotal / limit));
+    if (nextPage > lastPage) {
+      setPage(lastPage);
+      return;
+    }
     setVenues(items);
-    setTotal(typeof data.total === "number" ? data.total : items.length);
-    setPage(typeof data.page === "number" ? data.page : nextPage);
+    setTotal(nextTotal);
   }, [limit]);
 
   async function refetchVenues() {
+    const currentRequest = requestId.current + 1;
     try {
+      setLoading(true);
       await loadPage(page, q, status);
     } catch {
-      toast.error(t("adminUi.venues.toastReloadError"));
+      if (currentRequest === requestId.current) toast.error(t("adminUi.venues.toastReloadError"));
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }
 
@@ -83,18 +86,21 @@ export default function AdminVenuesPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const currentRequest = requestId.current + 1;
     (async () => {
       try {
         setLoading(true);
-        await loadPage(page, q, status);
+        await loadPage(page, q, status, controller.signal);
       } catch {
-        if (!cancelled) toast.error(t("adminUi.venues.toastLoadError"));
+        if (!cancelled && currentRequest === requestId.current) toast.error(t("adminUi.venues.toastLoadError"));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && currentRequest === requestId.current) setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [loadPage, page, q, status, t]);
 
@@ -153,7 +159,7 @@ export default function AdminVenuesPage() {
             <option value="">{t("adminUi.venues.allStatuses")}</option>
             {ADMIN_VENUE_STATUS_FILTERS.map((value) => (
               <option key={value} value={value}>
-                {t(STATUS_I18N[value])}
+                {t(ADMIN_VENUE_STATUS_I18N[value])}
               </option>
             ))}
           </select>
@@ -200,12 +206,16 @@ export default function AdminVenuesPage() {
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-0.5">
                     {venue.city && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {venue.city}</span>}
                     {hallMax ? <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {t("adminUi.venues.maxCapacity", { n: hallMax })}</span> : null}
-                    {venue.halls.minPrice ? <span>{venue.halls.minPrice.amount}€</span> : venue.pricePerPerson ? <span>{venue.pricePerPerson}€/pers</span> : null}
+                    {venue.halls.minPrice
+                      ? <span>{t("adminUi.venues.activeHallMinPrice", { price: adminKnownPriceText(venue.halls.minPrice, t) })}</span>
+                      : venue.halls.total === 0 && venue.pricePerPerson != null
+                        ? <span>{t("adminUi.venues.legacyPricePerPerson", { price: venue.pricePerPerson })}</span>
+                        : null}
                     {venue.ratingAvg ? <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-gold text-gold" /> {Number(venue.ratingAvg).toFixed(1)}</span> : null}
                     <span>{t("adminUi.venues.hallsCount", { count: venue.halls.total })}</span>
                     <span>
                       {venue.organization
-                        ? `${venue.organization.legalName || venue.organization.displayName} · ${t(STATUS_I18N[venue.organization.status] ?? "adminUi.venues.statusActive")}`
+                        ? `${venue.organization.legalName || venue.organization.displayName} · ${adminVenueStatusText(venue.organization.status, t)}`
                         : t("adminUi.venues.noOrganization")}
                     </span>
                   </div>
@@ -218,9 +228,11 @@ export default function AdminVenuesPage() {
                 <Link href={`/admin/sali/${venue.id}`}>
                   <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.editVenue")}><Edit className="h-4 w-4" /></Button>
                 </Link>
-                <Link href={`/sali/${venue.slug}`} target="_blank">
-                  <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.viewPublic")}><Eye className="h-4 w-4" /></Button>
-                </Link>
+                {venue.publicHref ? (
+                  <Link href={venue.publicHref} target="_blank">
+                    <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.viewPublic")}><Eye className="h-4 w-4" /></Button>
+                  </Link>
+                ) : null}
               </CardContent>
             </Card>
             );

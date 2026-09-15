@@ -15,7 +15,9 @@ const ru = readFileSync("src/i18n/ru.json", "utf8");
 const en = readFileSync("src/i18n/en.json", "utf8");
 
 test("admin venue list consumes the dedicated admin API items envelope", () => {
-  assert.match(listPage, /fetch\(`\/api\/admin\/venues\?\$\{params\.toString\(\)\}`\)/);
+  assert.match(listPage, /fetch\(`\/api\/admin\/venues\?\$\{params\.toString\(\)\}`, \{ signal \}\)/);
+  assert.match(listPage, /currentRequest !== requestId\.current/);
+  assert.match(listPage, /controller\.abort\(\)/);
   assert.match(listPage, /Array\.isArray\(data\.items\) \? data\.items : \[\]/);
   assert.doesNotMatch(listPage, /\/api\/venues\?limit=200/);
   assert.doesNotMatch(listPage, /from "next\/link"/);
@@ -51,6 +53,7 @@ test("registration GET adds org\/halls without changing POST approval", () => {
   assert.doesNotMatch(getPart, /rejectPartnerVenue\(/);
   assert.match(registrationPage, /adminUi\.registrations\.organization/);
   assert.match(registrationPage, /adminUi\.registrations\.halls/);
+  assert.match(registrationPage, /adminHallPriceText\(hall, t\)/);
   assert.doesNotMatch(registrationPage, /const orgCopy =/);
 });
 
@@ -58,6 +61,8 @@ test("admin contracts group by acceptanceSessionId and resolve org holders witho
   assert.match(contractsPage, /organizationId: legalAcceptances\.organizationId/);
   assert.match(contractsPage, /acceptanceSessionId: legalAcceptances\.acceptanceSessionId/);
   assert.match(contractsPage, /groupAdminContractSessions/);
+  assert.match(contractsPage, /uniqueAdminContractSessionIds\(recentRows\)/);
+  assert.match(contractsPage, /inArray\(legalAcceptances\.acceptanceSessionId, recentSessionIds\)/);
   assert.match(contractsPage, /key=\{session\.sessionId\}/);
   assert.match(contractsPage, /\/api\/legal\/accept\/\$\{session\.pdfAnchorId\}\/pdf/);
   assert.doesNotMatch(contractsPage, /userId \?\? r\.email/);
