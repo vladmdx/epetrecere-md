@@ -36,6 +36,7 @@
     "test:multihall:availability-scope-source": "npx tsx --test scripts/venue-availability-scope-source.test.ts",
     "test:phase5:source": "npx tsx --test scripts/phase5-public-catalog-source.test.ts scripts/phase5-catalog-pure.test.ts scripts/booking-create-client-idempotency.test.ts",
     "test:phase6a1:source": "npx tsx --test scripts/phase6a1-local-hall-context.test.ts scripts/phase6a1-correction-regression.test.ts scripts/venue-notification-routing.test.ts scripts/conversation-party-and-notification-context.test.ts scripts/booking-completion-review-regression.test.ts && npx tsx scripts/legal-acceptance-list-route-regression.cts && npx tsx scripts/notification-contact-regression.cts",
+    "test:phase6a2:source": "npx tsx --test scripts/phase6a2-admin-readonly.test.ts scripts/phase6a2-admin-ui-source.test.ts && npx tsx scripts/phase6a2-admin-venues-route-regression.cts",
     "test:phase6:financial-source": "npx tsx --test scripts/commission-financial-authorization-source.test.ts && npx tsx scripts/commission-route-request-regression.cts",
     "test:phase6:pdf-source": "npx tsx --test scripts/booking-contract-safety.test.ts scripts/signed-contract-pdf.test.ts",
     "test:multihall:flag": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-flag-regression.test.ts",

@@ -43,6 +43,31 @@ interface RegistrationRequest {
   priceFrom?: string | number | null;
   address?: string | null;
   contracts?: { id: number; documentTitle: string | null; signatureName: string; acceptedAt: string; copyUrl: string }[];
+  organization?: {
+    id: number;
+    displayName: string;
+    legalName: string | null;
+    type: string;
+    status: string;
+  } | null;
+  halls?: {
+    id: number;
+    nameRo: string;
+    status: string;
+    isLegacyDefault: boolean;
+    capacityMin: number | null;
+    capacityMax: number | null;
+    pricingModel: string;
+    basePrice: number | null;
+    currency: string;
+    photoCount: number;
+  }[];
+  summaries?: {
+    hallCount: number;
+    noHalls: boolean;
+    unpublishableCount: number;
+    allUnpublishable: boolean;
+  };
 }
 
 export default function RegistrationRequestsPage() {
@@ -237,6 +262,53 @@ export default function RegistrationRequestsPage() {
                         </p>
                       )}
                       {req.address && <p className="text-sm text-muted-foreground">{req.address}</p>}
+                      {req.type === "venue" && (
+                        <div className="space-y-2 pt-2">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {t("adminUi.registrations.organization")}
+                            </p>
+                            {req.organization ? (
+                              <p className="text-sm">
+                                {req.organization.legalName || req.organization.displayName}
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {t("adminUi.registrations.organizationId", { id: req.organization.id })} · {req.organization.status}
+                                </span>
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">{t("adminUi.registrations.noOrganization")}</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {t("adminUi.registrations.halls")}
+                            </p>
+                            {req.summaries?.noHalls ? (
+                              <p className="text-xs text-amber-500">{t("adminUi.registrations.noHallsSummary")}</p>
+                            ) : null}
+                            {req.summaries?.allUnpublishable ? (
+                              <p className="text-xs text-amber-500">{t("adminUi.registrations.unpublishableHallsSummary")}</p>
+                            ) : null}
+                            {req.halls?.length ? (
+                              <ul className="mt-1 space-y-1">
+                                {req.halls.map((hall) => (
+                                  <li key={hall.id} className="text-xs text-muted-foreground">
+                                    <span className="text-foreground">{hall.nameRo}</span>
+                                    {" · "}
+                                    {t("adminUi.registrations.hallStatus")}: {hall.status}
+                                    {hall.isLegacyDefault ? ` · ${t("adminUi.registrations.legacyDefault")}` : ""}
+                                    {` · ${t("adminUi.registrations.hallPhotos", { count: hall.photoCount })}`}
+                                    {hall.capacityMax != null || hall.capacityMin != null
+                                      ? ` · ${hall.capacityMin ?? "—"}–${hall.capacityMax ?? "—"}`
+                                      : ""}
+                                    {hall.basePrice != null ? ` · ${hall.basePrice} ${hall.currency}` : ""}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
                       {req.type === "artist" && req.baseCity && (
                         <p className="text-sm text-muted-foreground">{copy.travel} {req.baseCity}: {req.travelDistanceKm === 999 ? t("common.all") : `${req.travelDistanceKm ?? 30} km`}</p>
                       )}
