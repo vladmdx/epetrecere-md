@@ -4,6 +4,7 @@ import { FileText, Loader2, ShieldCheck } from "lucide-react";
 import Link from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 import type { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
+import type { PartnerIdentity } from "@/lib/legal";
 import { ESignature, type ESignatureValue } from "./e-signature";
 import { onboardingAgreementText } from "./onboarding-agreement-text";
 
@@ -11,11 +12,13 @@ export function OnboardingAgreement({
   subjectType,
   agreement,
   onChange,
+  initialIdentity,
   showValidation = false,
 }: {
   subjectType: "artist" | "venue";
   agreement: ReturnType<typeof useOnboardingAgreement>;
   onChange: (value: ESignatureValue) => void;
+  initialIdentity?: PartnerIdentity;
   showValidation?: boolean;
 }) {
   const { locale } = useLocale();
@@ -32,6 +35,7 @@ export function OnboardingAgreement({
     key={`${subjectType}-${locale}`}
     subjectType={subjectType}
     onChange={onChange}
+    initialIdentity={initialIdentity}
     showValidation={showValidation}
   />;
 

@@ -85,11 +85,13 @@ export function ESignature({
   subjectType,
   onChange,
   defaultName = "",
+  initialIdentity,
   showValidation = false,
 }: {
   subjectType: "artist" | "venue";
   onChange?: (v: ESignatureValue) => void;
   defaultName?: string;
+  initialIdentity?: PartnerIdentity;
   showValidation?: boolean;
 }) {
   const { t, locale } = useLocale();
@@ -119,11 +121,11 @@ export function ESignature({
   });
   // §5 asks for different details depending on what the partner is, so the
   // form follows the contract rather than inventing its own fields.
-  const [partnerType, setPartnerType] = useState<PartnerType>("individual");
-  const [legalName, setLegalName] = useState("");
-  const [idNumber, setIdNumber] = useState("");
-  const [legalAddress, setLegalAddress] = useState("");
-  const [representativeName, setRepresentativeName] = useState("");
+  const [partnerType, setPartnerType] = useState<PartnerType>(initialIdentity?.partnerType ?? "individual");
+  const [legalName, setLegalName] = useState(initialIdentity?.legalName ?? "");
+  const [idNumber, setIdNumber] = useState(initialIdentity?.idNumber ?? "");
+  const [legalAddress, setLegalAddress] = useState(initialIdentity?.legalAddress ?? "");
+  const [representativeName, setRepresentativeName] = useState(initialIdentity?.representativeName ?? "");
   const [contractOpen, setContractOpen] = useState(false);
   const [contractRead, setContractRead] = useState(false);
   // Returning to this onboarding step mounts a blank form. The parent must
@@ -134,15 +136,13 @@ export function ESignature({
     signatureImage: null,
     accepted: false,
     documents: docs.map((doc) => doc.slug),
-    identity: { partnerType: "individual", legalName: "", idNumber: null, legalAddress: null, representativeName: null },
-    validationIssues: [
-      "legalName",
-      "idNumber",
-      "legalAddress",
-      "documentsAccepted",
-      "signatureName",
-      "signatureImage",
-    ],
+    identity: initialIdentity ?? { partnerType: "individual", legalName: "", idNumber: null, legalAddress: null, representativeName: null },
+    validationIssues: signatureIssues({
+      acceptedDocuments: false,
+      identity: initialIdentity ?? { partnerType: "individual", legalName: "", idNumber: null, legalAddress: null, representativeName: null },
+      name: defaultName.trim(),
+      signature: { dataUrl: null, isValid: false },
+    }),
   });
   useLayoutEffect(() => {
     initialChange.current?.(initialValue.current);

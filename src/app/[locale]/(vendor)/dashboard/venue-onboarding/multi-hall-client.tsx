@@ -1796,6 +1796,13 @@ export default function MultiHallVenueOnboarding() {
             subjectType="venue"
             agreement={agreement}
             onChange={setSignature}
+            initialIdentity={{
+              partnerType: org.type,
+              legalName: org.legalName.trim(),
+              idNumber: org.idNumber.trim() || null,
+              legalAddress: org.legalAddress.trim() || null,
+              representativeName: null,
+            }}
             showValidation={showAgreementValidation}
           />
         )
