@@ -14,6 +14,10 @@
     {
       "path": "/api/cron/booking-confirmation-outbox",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/inbound-mail-archive",
+      "schedule": "0 6 * * *"
     }
   ],
   "installCommand": "npm install --workspaces=false --legacy-peer-deps",

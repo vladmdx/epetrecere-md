@@ -3382,3 +3382,25 @@ export const pushTokensRelations = relations(pushTokens, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+/** Server-only index of complete inbound RFC 822 messages in private Blob. */
+export const inboundEmailArchive = pgTable(
+  "inbound_email_archive",
+  {
+    emailId: uuid("email_id").primaryKey(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    fromAddress: text("from_address").notNull(),
+    recipients: text("recipients").array().notNull(),
+    subject: text("subject").notNull(),
+    messageId: text("message_id").notNull(),
+    blobPath: text("blob_path").notNull(),
+    byteLength: integer("byte_length").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("inbound_email_archive_received_idx").on(t.receivedAt),
+    check("inbound_email_archive_size_chk", sql`${t.byteLength} > 0 AND ${t.byteLength} <= 41943040`),
+    check("inbound_email_archive_sha256_chk", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
