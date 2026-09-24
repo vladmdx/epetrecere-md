@@ -1343,8 +1343,28 @@ export const notifications = pgTable("notifications", {
 ]);
 
 // ═══════════════════════════════════════════════════════
-// ACCOUNT ERASURE IDENTITY TOMBSTONES
+// ADMIN REGISTRATION EMAIL DELIVERY
 // ═══════════════════════════════════════════════
+/** Private, transactional administrator registration-email delivery queue (0042). */
+export const adminRegistrationEmailOutbox = pgTable("admin_registration_email_outbox", {
+  notificationId: integer("notification_id").primaryKey()
+    .references(() => notifications.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  check("admin_registration_email_outbox_status_check", sql`${t.status} IN ('pending','delivered','cancelled','dead_letter')`),
+  check("admin_registration_email_outbox_attempts_check", sql`${t.attempts} >= 0`),
+  index("admin_registration_email_due_idx").on(t.nextAttemptAt, t.notificationId).where(sql`${t.status} = 'pending'`),
+]);
+
+// ═══════════════════════════════════════════════════════
+// ACCOUNT ERASURE IDENTITY TOMBSTONES
+// ═══════════════════════════════════════════════════════
 export type AccountErasureIdentityStatus =
   | "pending"
   | "processing"
