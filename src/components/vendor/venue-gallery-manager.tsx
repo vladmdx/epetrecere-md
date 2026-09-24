@@ -159,8 +159,7 @@ export function VenueGalleryManager({
         }
         const upData = (await upRes.json()) as { url: string };
 
-        // Persist via /api/venue-images. First image auto-cover.
-        const isFirst = images.length === 0 && uploading === 1; // only first batch item
+        // The server atomically chooses the first image as cover.
         const alt = suggestedAlt(file.name);
         const createRes = await fetch("/api/venue-images", {
           method: "POST",
@@ -169,7 +168,6 @@ export function VenueGalleryManager({
             venueId,
             url: upData.url,
             altRo: alt,
-            isCover: isFirst,
           }),
         });
         if (!createRes.ok) {

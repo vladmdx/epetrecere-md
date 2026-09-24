@@ -271,7 +271,7 @@ export default function VenueProfilePage() {
               </span>
             ) : (
               <span className="ml-2 rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">
-                {t("vendor.venueFinance.statusPending")}
+                {t("vendor.publication.unpublishedTitle")}
               </span>
             )}
           </p>
@@ -306,7 +306,7 @@ export default function VenueProfilePage() {
         <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <p>
-            {t("vendor.venueProfile.pendingApproval")}
+            {t("vendor.publication.unpublishedDescription")}
           </p>
         </div>
       )}

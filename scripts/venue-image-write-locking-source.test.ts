@@ -120,14 +120,14 @@ test("the public gallery never exposes inactive venue images to anonymous caller
   assert.ok(getStart >= 0 && getEnd > getStart);
   const getBody = route.slice(getStart, getEnd);
 
-  assert.match(getBody, /\.select\(\{ isActive: venues\.isActive \}\)/);
+  assert.match(getBody, /\.where\(and\(eq\(venues\.id, venueId\), publishedVenuePredicateSql\(\)\)\)/);
   assert.match(
     getBody,
-    /if \(!venue\.isActive\)[\s\S]*getCurrentAppUser\(\)[\s\S]*authorizeVenueCapability\(actor, venueId, "view_private"\)/,
+    /if \(!published\)[\s\S]*getCurrentAppUser\(\)[\s\S]*authorizeVenueCapability\(actor, venueId, "view_private"\)/,
   );
   assert.match(
     getBody,
-    /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*canViewInactive \? undefined : eq\(venues\.isActive, true\)/,
+    /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*canViewPrivate \? undefined : publishedVenuePredicateSql\(\)/,
   );
 });
 
@@ -256,7 +256,7 @@ test("cover, reorder, update and delete execute inside short transactions", () =
   }
   assert.match(
     writes,
-    /if \(input\.isCover\)[\s\S]*lockAllVenueImages[\s\S]*isCover: false[\s\S]*insert\(venueImages\)/,
+    /const existingImages = await lockAllVenueImages[\s\S]*const isCover = input\.isCover \|\| !existingImages\.some\(\(image\) => image\.hallId == null\)[\s\S]*if \(isCover\)[\s\S]*isCover: false[\s\S]*insert\(venueImages\)/,
   );
   assert.match(writes, /hallImageMutationFailure\(requestedHallId\)/);
   assert.equal(writes.match(/hallImageMutationFailure\(image\.hallId\)/g)?.length, 2);
