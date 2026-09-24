@@ -69,7 +69,7 @@ export function VenueSettingsClient({
   userPhone: string | null;
   userLanguage: string;
   userTimezone: string;
-  icalUrl: string;
+  icalUrl: string | null;
   notificationDigestFrequency: string;
   organizationId?: number | null;
 }) {
@@ -182,6 +182,7 @@ export function VenueSettingsClient({
   }
 
   async function copyIcal() {
+    if (!icalUrl) return;
     try {
       await navigator.clipboard.writeText(icalUrl);
       setCopied(true);
@@ -351,12 +352,13 @@ export function VenueSettingsClient({
           <div className="flex gap-2">
             <Input
               readOnly
-              value={icalUrl}
+              value={icalUrl ?? ""}
               className="font-mono text-xs"
               onFocus={(e) => e.target.select()}
             />
             <Button
               onClick={copyIcal}
+              disabled={!icalUrl}
               size="icon"
               variant="outline"
               className="shrink-0"
@@ -368,6 +370,7 @@ export function VenueSettingsClient({
               )}
             </Button>
           </div>
+          {!icalUrl && <p role="status" className="text-xs text-muted-foreground">{t("vendorSalaCalendar.icalUnavailable")}</p>}
           <details className="rounded-lg bg-muted/20 p-3 text-xs">
             <summary className="cursor-pointer font-medium">
               {t("vendor.venueSettings.icalHowTitle")}
@@ -715,4 +718,3 @@ export function VenueSettingsClient({
     </div>
   );
 }
-

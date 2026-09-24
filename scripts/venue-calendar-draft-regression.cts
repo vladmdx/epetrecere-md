@@ -9,6 +9,7 @@ const load = createRequire(__filename);
 let token: string | null = null;
 let authorized = true;
 const Calendar = () => null;
+const Settings = () => null;
 Object.assign(globalThis, { React });
 Module._load = function (request, parent, isMain) {
   if (request === "@clerk/nextjs/server") return { auth: async () => ({ userId: "clerk-demo" }) };
@@ -22,11 +23,14 @@ Module._load = function (request, parent, isMain) {
   };
   if (request === "@/lib/calendar/ical-token") return { getVenueIcalTokenForUser: async () => token };
   if (request === "../../../sala/calendar/client") return { VenueCalendarClient: Calendar };
+  if (request === "../../../sala/setari/client") return { VenueSettingsClient: Settings };
   if (request === "@/lib/booking/merged-calendar") return { getMergedVenueCalendar: async () => [] };
-  if (request === "@/lib/db") return { db: { select: () => {
+  if (request === "@/lib/db") return { db: { select: (fields: { calendarEnabled?: unknown }) => {
     const query = {
       from: () => query, where: () => query,
-      limit: async () => [{ id: "owner", googleRefreshToken: null }],
+      limit: async () => fields.calendarEnabled
+        ? [{ id: 30, nameRo: "DEMO", calendarEnabled: true }]
+        : [{ id: "owner", googleRefreshToken: null, email: "demo@example.invalid" }],
       then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve([]).then(resolve),
     };
     return query;
@@ -46,16 +50,28 @@ void (async () => {
     token = "test-feed-token";
     const active = await page(args);
     assert.match(active.props.icalUrl, /\/venue-ical\/30\/test-feed-token\.ics\?hallId=3$/);
+    const settingsPage = load("../src/app/[locale]/(vendor)/dashboard/locatii/[venueId]/setari/page").default;
+    token = null;
+    const draftSettings = await settingsPage(args);
+    assert.equal(draftSettings.type, Settings);
+    assert.equal(draftSettings.props.icalUrl, null);
+    assert.equal(draftSettings.props.venue.id, 30);
+    token = "test-feed-token";
+    assert.match((await settingsPage(args)).props.icalUrl, /\/venue-ical\/30\/test-feed-token\.ics$/);
     authorized = false;
     await assert.rejects(page(args), /denied/);
+    await assert.rejects(settingsPage(args), /denied/);
 
     const client = readFileSync("src/app/[locale]/(vendor)/dashboard/sala/calendar/client.tsx", "utf8");
     assert.match(client, /if \(!icalUrl\) return/);
     assert.match(client, /disabled=\{!icalUrl\}/);
     assert.match(client, /open=\{showIcalSheet && !!icalUrl\}/);
+    const settingsClient = readFileSync("src/app/[locale]/(vendor)/dashboard/sala/setari/client.tsx", "utf8");
+    assert.match(settingsClient, /if \(!icalUrl\) return/);
+    assert.match(settingsClient, /disabled=\{!icalUrl\}/);
     // The feed itself must still require an active organization.
     assert.match(readFileSync("src/lib/calendar/ical-token.ts", "utf8"), /eq\(partnerOrganizations.status, "active"\)/);
-    console.log("Draft calendar renders without a feed; active feed, hall scope and access denial verified");
+    console.log("Draft calendar and settings render without a feed; active feed, hall scope and access denial verified");
   } finally {
     Module._load = original;
   }
