@@ -10,7 +10,7 @@ import { users, venues } from "@/lib/db/schema";
 import { getCurrentAppUser, listAccessibleVenueIds, resolveSelectedVenue } from "@/lib/venue-access";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { DEFAULT_LOCALE, localizePath, type AppLocale } from "@/lib/i18n/routing";
-import { readLastVenueCookie, writeLastVenueCookie } from "./last-selected";
+import { readLastVenueCookie } from "./last-selected";
 
 export type DashboardVenue = {
   id: number;
@@ -42,7 +42,6 @@ export async function loadAuthorizedDashboardVenue(
     .from(venues)
     .where(eq(venues.id, selection.venueId))
     .limit(1);
-  if (venue) await writeLastVenueCookie(venue.id);
   return venue ?? null;
 }
 
@@ -76,11 +75,9 @@ export async function redirectLegacySalaPath(opts: {
   const cookieId = await readLastVenueCookie();
   const requested = opts.requestedVenueId ?? cookieId;
   if (requested != null && ids.includes(requested)) {
-    await writeLastVenueCookie(requested);
     redirect(localizePath(`/dashboard/locatii/${requested}${rest}`, locale));
   }
   if (ids.length === 1) {
-    await writeLastVenueCookie(ids[0]);
     redirect(localizePath(`/dashboard/locatii/${ids[0]}${rest}`, locale));
   }
   redirect(localizePath("/dashboard/locatii", locale));

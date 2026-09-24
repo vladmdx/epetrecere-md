@@ -135,7 +135,7 @@ export function VenueSidebar({
           canManageFinancials={canManageFinancials}
         />
 
-        {profileHref && <div className="border-t border-border/20 p-3">
+        <div className="border-t border-border/20 p-3">
           <Link
             href="/dashboard/locatii"
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
@@ -143,15 +143,15 @@ export function VenueSidebar({
             <Building2 className="h-4 w-4 shrink-0" />
             <span>{t("vendor.venueSidebar.switchVenue")}</span>
           </Link>
-          <Link
+          {profileHref && <Link
             href={profileHref}
             target="_blank"
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
           >
             <Globe className="h-4 w-4 shrink-0" />
             <span>{t("dashboard.viewProfile")}</span>
-          </Link>
-        </div>}
+          </Link>}
+        </div>
       </aside>
 
       {/* Mobile hamburger — sits in the top-left, only below `lg` */}
@@ -212,8 +212,16 @@ export function VenueSidebar({
               onNavigate={() => setMobileOpen(false)}
             />
 
-            {profileHref && <div className="border-t border-border/20 p-3">
+            <div className="border-t border-border/20 p-3">
               <Link
+                href="/dashboard/locatii"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
+              >
+                <Building2 className="h-4 w-4 shrink-0" />
+                <span>{t("vendor.venueSidebar.switchVenue")}</span>
+              </Link>
+              {profileHref && <Link
                 href={profileHref}
                 target="_blank"
                 onClick={() => setMobileOpen(false)}
@@ -221,8 +229,8 @@ export function VenueSidebar({
               >
                 <Globe className="h-4 w-4 shrink-0" />
                 <span>{t("dashboard.viewProfile")}</span>
-              </Link>
-            </div>}
+              </Link>}
+            </div>
           </aside>
         </div>
       )}
