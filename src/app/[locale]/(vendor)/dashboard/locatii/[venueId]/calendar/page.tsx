@@ -87,10 +87,13 @@ export default async function LocatieCalendarPage({
   ]);
 
   const icalToken = await getVenueIcalTokenForUser(venue.id, appUser.id);
-  if (!icalToken) redirect(localizePath("/dashboard", locale));
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://epetrecere.md";
   const hallQs = Number.isFinite(hallFilter) ? `?hallId=${hallFilter}` : "";
-  const icalUrl = `${appUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics${hallQs}`;
+  // Dashboard access and external feed access have different approval gates.
+  // A draft organization may manage its calendar without an export token.
+  const icalUrl = icalToken
+    ? `${appUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics${hallQs}`
+    : null;
 
   const visibleBookings = Number.isFinite(hallFilter)
     ? bookingsRows.filter((row) => row.hallId == null || row.hallId === hallFilter)

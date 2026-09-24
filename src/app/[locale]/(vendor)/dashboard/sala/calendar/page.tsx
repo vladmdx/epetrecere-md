@@ -110,10 +110,11 @@ export default async function VenueCalendarPage({
   ]);
 
   const icalToken = await getVenueIcalTokenForUser(venue.id, appUser.id);
-  if (!icalToken) redirect("/dashboard");
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? "https://epetrecere.md";
-  const icalUrl = `${appUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics`;
+  const icalUrl = icalToken
+    ? `${appUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics`
+    : null;
 
   return (
     <VenueCalendarClient

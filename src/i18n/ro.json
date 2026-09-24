@@ -6200,6 +6200,7 @@
     "icalDialogTitle": "Link iCal pentru sala ta",
     "icalLink": "Link iCal",
     "icalPrivateWarning": "⚠️ Acest link este privat — nu îl publica. Oricine are linkul vede rezervările tale confirmate.",
+    "icalUnavailable": "Exportul iCal nu este disponibil pentru acest cont în starea curentă. Calendarul rămâne accesibil în dashboard.",
     "jumpToMonth": "Sari la o lună",
     "legendTentative": "Tentativ (pending)",
     "listEmptyHint": "Treci în vizualizarea Calendar pentru a seta zile disponibile sau blocate.",

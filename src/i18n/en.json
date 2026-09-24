@@ -6200,6 +6200,7 @@
     "icalDialogTitle": "iCal link for your venue",
     "icalLink": "iCal link",
     "icalPrivateWarning": "⚠️ This link is private — do not publish it. Anyone with the link sees your confirmed bookings.",
+    "icalUnavailable": "iCal export is unavailable for this account in its current state. You can still access the calendar in your dashboard.",
     "jumpToMonth": "Jump to a month",
     "legendTentative": "Tentative (pending)",
     "listEmptyHint": "Switch to Calendar view to set available or blocked days.",
