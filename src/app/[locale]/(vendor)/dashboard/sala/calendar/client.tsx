@@ -69,7 +69,7 @@ interface Props {
   events: CalendarEvent[];
   bookings: Booking[];
   initialDate: string | null;
-  icalUrl: string;
+  icalUrl: string | null;
   googleConnected: boolean;
   basePath?: string;
   halls?: Array<{ id: number; nameRo: string; status: string }>;
@@ -293,6 +293,7 @@ export function VenueCalendarClient({
   }
 
   async function copyIcalUrl() {
+    if (!icalUrl) return;
     try {
       await navigator.clipboard.writeText(icalUrl);
       toast.success(t("vendorSalaCalendar.icalCopied"));
@@ -576,6 +577,8 @@ export function VenueCalendarClient({
               variant="outline"
               size="sm"
               onClick={() => setShowIcalSheet(true)}
+              disabled={!icalUrl}
+              title={!icalUrl ? t("vendorSalaCalendar.icalUnavailable") : undefined}
               className="h-7 text-xs"
             >
               <LinkIcon className="mr-1 h-3 w-3" /> {t("vendorSalaCalendar.icalLink")}
@@ -738,7 +741,8 @@ export function VenueCalendarClient({
       )}
 
       {/* iCal link dialog — spec 2.6 */}
-      <Dialog open={showIcalSheet} onOpenChange={setShowIcalSheet}>
+      {!icalUrl && <p role="status" className="text-xs text-muted-foreground">{t("vendorSalaCalendar.icalUnavailable")}</p>}
+      <Dialog open={showIcalSheet && !!icalUrl} onOpenChange={setShowIcalSheet}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("vendorSalaCalendar.icalDialogTitle")}</DialogTitle>
