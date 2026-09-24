@@ -112,6 +112,32 @@ async function dropUpdateTrigger() {
 }
 
 describe("atomic venue-image reorder", { concurrency: false }, () => {
+  test("concurrent first gallery uploads create exactly one automatic cover", async () => {
+    const [target] = await db.insert(venues).values({
+      nameRo: `${MARK} auto cover`, slug: `${MARK}-auto-cover`, organizationId,
+    }).returning({ id: venues.id });
+    try {
+      const results = await Promise.all([1, 2].map((index) => createVenueImage(actorUserId, {
+        venueId: target.id, url: `https://example.com/${MARK}-cover-${index}.png`, isCover: false,
+      })));
+      assert.ok(results.every((result) => result.ok));
+      let rows = await db.select().from(venueImages).where(eq(venueImages.venueId, target.id));
+      assert.equal(rows.length, 2);
+      assert.equal(rows.filter((row) => row.isCover).length, 1);
+      const originalCover = rows.find((row) => row.isCover)!.id;
+      const next = await createVenueImage(actorUserId, {
+        venueId: target.id, url: `https://example.com/${MARK}-cover-next.png`, isCover: false,
+      });
+      assert.equal(next.ok, true);
+      if (next.ok) assert.equal(next.image.isCover, false);
+      rows = await db.select().from(venueImages).where(eq(venueImages.venueId, target.id));
+      assert.deepEqual(rows.filter((row) => row.isCover).map((row) => row.id), [originalCover]);
+    } finally {
+      await db.delete(venueImages).where(eq(venueImages.venueId, target.id));
+      await db.delete(venues).where(eq(venues.id, target.id));
+    }
+  });
+
   before(async () => {
     process.env.FEATURE_MULTI_HALL = "1";
     const [actor, otherOwner] = await db

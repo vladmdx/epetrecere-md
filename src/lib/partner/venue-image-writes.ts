@@ -190,8 +190,11 @@ export async function createVenueImage(
       const blocked = hallImageMutationFailure(requestedHallId);
       if (blocked) return blocked;
 
-      if (input.isCover) {
-        await lockAllVenueImages(executor, authority.venue.id);
+      const existingImages = await lockAllVenueImages(executor, authority.venue.id);
+      // Decide under the venue/gallery locks, not from a stale browser upload
+      // counter. Concurrent first uploads must produce exactly one cover.
+      const isCover = input.isCover || !existingImages.some((image) => image.hallId == null);
+      if (isCover) {
         await executor
           .update(venueImages)
           .set({ isCover: false })
@@ -210,7 +213,7 @@ export async function createVenueImage(
           altRo: input.altRo ?? null,
           altRu: input.altRu ?? null,
           altEn: input.altEn ?? null,
-          isCover: input.isCover,
+          isCover,
         })
         .returning();
       if (!created) throw new VenueImageMutationConflictError("IMAGE_CREATE_CONFLICT");
