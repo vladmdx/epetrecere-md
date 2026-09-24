@@ -40,6 +40,7 @@ import {
   type EventTypeKey,
 } from "@/lib/events/normalize";
 import { useLocale } from "@/hooks/use-locale";
+import { venueCalendarNavigationPath } from "@/lib/calendar/venue-navigation";
 
 interface CalendarEvent {
   date: string;
@@ -260,14 +261,14 @@ export function VenueCalendarClient({
     if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
     if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
     const monthStr = `${y}-${String(m + 1).padStart(2, "0")}`;
-    router.push(`${basePath}?month=${monthStr}`);
+    router.push(venueCalendarNavigationPath(basePath, { month: monthStr }, selectedHallId));
   }
 
   function jumpToMonth(y: number, m: number) {
     if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
     if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
     router.push(
-      `${basePath}?month=${y}-${String(m + 1).padStart(2, "0")}`,
+      venueCalendarNavigationPath(basePath, { month: `${y}-${String(m + 1).padStart(2, "0")}` }, selectedHallId),
     );
   }
 
@@ -289,7 +290,7 @@ export function VenueCalendarClient({
 
   function goToday() {
     const ts = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
-    router.push(`${basePath}?date=${ts}`);
+    router.push(venueCalendarNavigationPath(basePath, { date: ts }, selectedHallId));
   }
 
   async function copyIcalUrl() {
