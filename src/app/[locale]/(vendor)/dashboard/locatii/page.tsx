@@ -11,7 +11,6 @@ import {
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 import Link from "@/components/shared/locale-link";
 import { Card, CardContent } from "@/components/ui/card";
-import { writeLastVenueCookie } from "@/lib/venues/last-selected";
 import { salaUsesLegacyLayout } from "@/lib/partner/multi-hall-gate";
 
 export const dynamic = "force-dynamic";
@@ -43,11 +42,6 @@ export default async function LocatiiPickerPage({
     listAccessibleVenues(appUser.id),
     listAccessibleOrganizations(appUser.id),
   ]);
-
-  if (venues.length === 1) {
-    await writeLastVenueCookie(venues[0].id);
-    redirect(localizePath(`/dashboard/locatii/${venues[0].id}`, locale));
-  }
 
   if (venues.length === 0 && organizations.length === 0) {
     redirect(localizePath("/dashboard/venue-onboarding", locale));

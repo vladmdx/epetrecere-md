@@ -1,4 +1,5 @@
 import { VenueSidebar } from "@/components/vendor/venue-sidebar";
+import { RememberVenueSelection } from "@/components/vendor/remember-venue-selection";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { redirect } from "next/navigation";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
@@ -26,6 +27,7 @@ export default async function LocatieDashboardLayout({
 
   return (
     <div className="flex h-dvh overflow-hidden">
+      <RememberVenueSelection venueId={venue.id} />
       <VenueSidebar
         venueName={venue.nameRo}
         venueSlug={venue.slug}

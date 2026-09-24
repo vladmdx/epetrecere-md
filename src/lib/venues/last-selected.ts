@@ -18,6 +18,7 @@ export async function writeLastVenueCookie(venueId: number): Promise<void> {
   const store = await cookies();
   store.set(LAST_VENUE_COOKIE, String(venueId), {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 180,
