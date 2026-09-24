@@ -58,6 +58,8 @@
     "test:wishlist:visibility": "npx tsx scripts/wishlist-public-visibility-regression.cts",
     "test:multihall:registration-locking-source": "npx tsx --test scripts/venue-registration-locking-source.test.ts",
     "test:auth:phone-source": "npx tsx --test scripts/user-phone-locking-source.test.ts scripts/database-driver-transaction-source.test.ts",
+    "test:auth:role-recovery": "npx tsx --test scripts/auth-role-recovery.test.ts && npx tsx scripts/admin-check-role-regression.cts",
+    "test:registration-email": "npx tsx scripts/run-guarded-db-test.ts scripts/registration-email-regression.test.ts",
     "test:auth:role-concurrency": "npx tsx scripts/run-guarded-db-test.ts scripts/select-role-concurrency-regression.test.ts",
     "test:multihall:legal-session": "npx tsx scripts/run-guarded-db-test.ts scripts/legal-acceptance-session-regression.test.ts",
     "test:multihall:pass2": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-correction-pass2-regression.test.ts",

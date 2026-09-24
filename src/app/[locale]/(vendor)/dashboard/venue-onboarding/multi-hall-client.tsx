@@ -60,6 +60,31 @@ import {
 const STEPS = ["Organizație", "Contract", "Local", "Sală", "Trimitere"];
 
 type Missing = { step: string; field: string; message: string; path: string };
+const READINESS_MESSAGES: Record<string, string> = {
+  organization_required: "Selectează o organizație pentru acest local.",
+  display_name_required: "Completează numele organizației (minimum 2 caractere).",
+  legal_name_invalid: "Completează denumirea juridică (minimum 2 caractere).",
+  moldovan_id_must_have_13_digits: "IDNP/IDNO trebuie să conțină exact 13 cifre.",
+  legal_address_invalid: "Completează adresa juridică (minimum 5 caractere).",
+  current_signed_contract_required: "Semnează contractul organizației înainte de trimitere.",
+  venue_required: "Selectează un local.",
+  venue_name_required: "Completează numele localului (minimum 2 caractere).",
+  address_required: "Completează adresa localului (minimum 5 caractere).",
+  city_required: "Alege orașul localului.",
+  images_required: "Adaugă cel puțin o fotografie a localului.",
+  at_least_one_hall: "Adaugă cel puțin o sală.",
+  hall_selection_invalid: "Selectează o sală validă.",
+  hall_name_required: "Completează numele sălii.",
+  capacity_required: "Completează capacitatea sălii.",
+  hall_images_required: "Adaugă cel puțin o fotografie a sălii.",
+  hall_slug_required: "Verifică denumirea sălii.",
+  at_least_one_submittable_hall: "Completează cel puțin o sală înainte de trimitere.",
+};
+
+function readinessMessage(issue: Missing): string {
+  return READINESS_MESSAGES[issue.message] ?? "Verifică informațiile obligatorii din acest pas.";
+}
+
 type OnboardingScopeToken = Readonly<{
   actorId: string;
   identity: string;
@@ -958,7 +983,7 @@ export default function MultiHallVenueOnboarding() {
     if (!first) return;
     const map: Record<string, number> = { organization: 0, legal: 1, contract: 1, venue: 2, hall: 3, submit: 4 };
     setStep(map[first.step] ?? 0);
-    toast.error(first.message);
+    toast.error(readinessMessage(first));
   }
 
   function discardPendingOrganizationCreate() {
@@ -1723,7 +1748,7 @@ export default function MultiHallVenueOnboarding() {
           </div>
         </div>
       )}
-      {missing[0] && <p className="text-sm text-red-400">Lipsește: {missing[0].path} — {missing[0].message}</p>}
+      {missing[0] && <p role="alert" className="text-sm text-red-400">{readinessMessage(missing[0])}</p>}
 
       {step === 0 && (
         <fieldset disabled={hasPendingOrganizationCreate || organizationCreateRecoveryOnly} className="space-y-3 disabled:opacity-70">
@@ -1771,6 +1796,13 @@ export default function MultiHallVenueOnboarding() {
             subjectType="venue"
             agreement={agreement}
             onChange={setSignature}
+            initialIdentity={{
+              partnerType: org.type,
+              legalName: org.legalName.trim(),
+              idNumber: org.idNumber.trim() || null,
+              legalAddress: org.legalAddress.trim() || null,
+              representativeName: null,
+            }}
             showValidation={showAgreementValidation}
           />
         )

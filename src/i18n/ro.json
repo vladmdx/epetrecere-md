@@ -56,6 +56,8 @@
     "phoneHint": "Folosit pentru confirmările rezervărilor. Nu este afișat public. Administratorii autorizați îl pot accesa, iar cealaltă parte îl primește doar după confirmarea finală a rezervării de către ambele părți.",
     "phoneTooShort": "Numărul de telefon e prea scurt",
     "phoneSaveFailed": "Nu s-a putut salva numărul. Încearcă din nou.",
+    "profileLoadFailed": "Nu am putut încărca profilul contului. Reîncearcă; nu este nevoie să ieși din cont.",
+    "retryProfile": "Reîncearcă",
     "roleQuestion": "Cum dorești să folosești platforma?",
     "roleClient": "Client",
     "roleClientDesc": "Caut artiști și săli pentru evenimentul meu",

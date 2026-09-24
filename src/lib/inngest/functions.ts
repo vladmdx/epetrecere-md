@@ -21,6 +21,7 @@ import { isGuestTokenActive } from "@/lib/invitations/access";
 import { drainConfirmationNotificationOutbox } from "@/lib/booking/confirmation-effects";
 import { drainBookingCreationNotificationOutbox } from "@/lib/booking/booking-create-effects";
 import { retryPendingLegalContractDeliveries } from "@/lib/legal/contract-delivery";
+import { drainRegistrationEmails } from "@/lib/notifications/registration-email";
 import {
   buildGoogleCalendarEntityPlans,
   clearGoogleCalendarOrphanProjection,
@@ -450,6 +451,16 @@ export const accountErasureIdentityOutboxWorker = inngest.createFunction(
     }),
 );
 
+// Durable administrator email recovery after a venue is submitted for review.
+export const retryRegistrationEmails = inngest.createFunction(
+  { id: "retry-registration-emails", triggers: [{ cron: "*/5 * * * *" }], concurrency: { limit: 1 } },
+  async ({ step }) => step.run("deliver-registration-emails", async () => {
+    const result = await drainRegistrationEmails({ limit: 10 });
+    if (result.failed || result.deadLetterBacklog) throw new Error("registration_email_queue_unhealthy");
+    return result;
+  }),
+);
+
 // Durable legal-delivery recovery. The request path tries immediately via
 // after(), while this worker guarantees that a transient PDF/email failure is
 // not left permanently pending when the signer never submits again.
@@ -643,5 +654,6 @@ export const functions = [
   accountAssetErasureOutbox,
   accountErasureIdentityOutboxWorker,
   retryLegalContractDeliveries,
+  retryRegistrationEmails,
   googleCalendarSync,
 ];

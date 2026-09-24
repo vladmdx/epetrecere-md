@@ -367,6 +367,28 @@ DATABASE_URL=<prod> npx tsx scripts/apply-sql-file.ts \
   src/lib/db/migrations/manual/0015_push_tokens.sql
 ```
 
+## Registration email delivery: `0042_admin_registration_email_outbox.sql`
+
+Apply this additive, idempotent migration **before** deploying the matching
+registration-email worker. Venue submission and its administrator email jobs
+commit atomically. No venue/account data or legal acceptances are rewritten.
+The private queue has RLS and no browser-role grants; recipient authorization
+is checked again before each send. Existing legal PDF delivery remains separate.
+
+Verify on a disposable guarded local database first:
+
+```bash
+DATABASE_URL=<local> npx tsx scripts/apply-sql-file.ts src/lib/db/migrations/manual/0042_admin_registration_email_outbox.sql
+npm run test:registration-email
+npm run test:multihall:phase3
+npm run test:auth:role-recovery
+```
+
+Inngest retries every five minutes; the existing daily Vercel outbox cron is a
+fallback. Dead letters produce failed monitoring runs and require investigation.
+Retries stop before Resend's idempotency retention expires. On code rollback,
+leave the additive table in place; do not drop pending delivery evidence.
+
 ## Future consolidation (optional, do deliberately)
 
 To get back to a clean, Drizzle-tracked history:

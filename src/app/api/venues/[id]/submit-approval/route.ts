@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { requireVenueCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
 import { submitVenueForApproval } from "@/lib/partner/onboarding";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 import { z } from "zod/v4";
+import { drainRegistrationEmails } from "@/lib/notifications/registration-email";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -30,5 +31,12 @@ export async function POST(req: Request, ctx: Ctx) {
       missing: "missing" in result ? result.missing : undefined,
     });
   }
+  after(async () => {
+    try {
+      await drainRegistrationEmails({ limit: 2 });
+    } catch {
+      console.error('[venue-submit] Registration email queue remains pending');
+    }
+  });
   return NextResponse.json(result);
 }

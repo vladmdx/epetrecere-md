@@ -5,6 +5,7 @@ import { drainAccountAssetErasureOutbox } from "@/lib/privacy/account-asset-eras
 import { drainAccountErasureIdentityOutbox } from "@/lib/privacy/account-erasure-identity";
 import { reconcileOnboardedReferrals } from "@/lib/referrals/trigger";
 import { retryPendingLegalContractDeliveries } from "@/lib/legal/contract-delivery";
+import { drainRegistrationEmails } from "@/lib/notifications/registration-email";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
     legalDelivery,
     confirmation,
     creation,
+    registrationEmails,
   ] = await Promise.all([
     reconcileOnboardedReferrals({ limit: FALLBACK_PROVIDER_BATCH }),
     drainAccountErasureIdentityOutbox({
@@ -56,6 +58,7 @@ export async function GET(req: NextRequest) {
       maxDeliveriesPerEffect: FALLBACK_PROVIDER_BATCH,
       providerTimeoutMs: FALLBACK_PROVIDER_TIMEOUT_MS,
     }),
+    drainRegistrationEmails({ limit: FALLBACK_PROVIDER_BATCH, providerTimeoutMs: FALLBACK_PROVIDER_TIMEOUT_MS }),
   ]);
   // Keep confirmation counters at the top level for backwards-compatible
   // monitoring, and attach the creation drain as a namespaced summary.
@@ -66,6 +69,7 @@ export async function GET(req: NextRequest) {
     assetErasure,
     identityErasure,
     legalDelivery,
+    registrationEmails,
   };
   // Non-2xx is intentional observability: durable rows remain retryable in
   // the database, while Vercel monitoring can no longer mistake a provider
@@ -83,6 +87,8 @@ export async function GET(req: NextRequest) {
     || identityErasure.failed > 0
     || legalDelivery.failed > 0
     || legalDelivery.newlyDeadLettered > 0
-    || legalDelivery.deadLetterBacklog > 0;
+    || legalDelivery.deadLetterBacklog > 0
+    || registrationEmails.failed > 0
+    || registrationEmails.deadLetterBacklog > 0;
   return NextResponse.json(result, { status: unhealthy ? 503 : 200 });
 }

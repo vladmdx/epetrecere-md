@@ -6,6 +6,7 @@ import { Loader2, Music, Building2, PartyPopper, Phone } from "lucide-react";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 import { hasPendingWizardSubmission, submitPendingWizard } from "@/lib/wizard/submission";
+import { fetchAccountRole } from "@/lib/auth/check-role-client";
 
 /**
  * If the user just came through the public /planifica wizard, their answers
@@ -36,6 +37,8 @@ export default function AuthRedirectPage() {
   const router = useLocalizedRouter();
   const { t } = useLocale();
   const [checking, setChecking] = useState(true);
+  const [checkFailed, setCheckFailed] = useState(false);
+  const [checkAttempt, setCheckAttempt] = useState(0);
   const [showPhoneStep, setShowPhoneStep] = useState(false);
   const [showRoleSelect, setShowRoleSelect] = useState(false);
   const [selectedRole, setSelectedRole] = useState<RoleChoice>(null);
@@ -104,33 +107,13 @@ export default function AuthRedirectPage() {
 
     async function checkRole() {
       try {
-        const email = user?.primaryEmailAddress?.emailAddress;
-        if (!email) {
-          // No email yet — show role picker directly (safest default for new users)
-          setShowRoleSelect(true);
-          setChecking(false);
-          return;
-        }
-
-        const res = await fetch(
-          // The endpoint is authenticated and self-scoped. The cache-buster
-          // carries no identity data and defeats intermediaries that ignore
-          // the explicit no-store request headers.
-          `/api/auth/check-role?_t=${Date.now()}`,
-          {
-            cache: "no-store",
-            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
-          },
-        );
+        const res = await fetchAccountRole();
         if (!res.ok) {
-          setShowRoleSelect(true);
+          setCheckFailed(true);
           setChecking(false);
           return;
         }
         const data = await res.json();
-        // Surfaces in the browser console so the user/QA can confirm
-        // which branch we entered and why.
-        console.log("[auth-redirect] check-role →", data);
 
         if (data.role === "admin" || data.role === "super_admin") {
           router.replace("/admin");
@@ -193,14 +176,14 @@ export default function AuthRedirectPage() {
           router.replace(planUrl ?? "/cabinet");
         }
       } catch {
-        // On error, show role picker as safe fallback
-        setShowRoleSelect(true);
+        // A failed request is not evidence that an existing partner is new.
+        setCheckFailed(true);
         setChecking(false);
       }
     }
 
     checkRole();
-  }, [isLoaded, isSignedIn, user, router]);
+  }, [isLoaded, isSignedIn, user, router, checkAttempt]);
 
   async function handlePhoneSubmit() {
     const trimmed = phoneInput.trim();
@@ -230,6 +213,8 @@ export default function AuthRedirectPage() {
       // Move on to role picker
       setShowPhoneStep(false);
       setShowRoleSelect(true);
+    } catch {
+      setPhoneError(t("auth.phoneSaveFailed"));
     } finally {
       setSavingPhone(false);
     }
@@ -298,6 +283,24 @@ export default function AuthRedirectPage() {
         router.replace("/dashboard/venue-onboarding");
       }
     }
+  }
+
+  if (checkFailed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] px-4">
+        <div className="max-w-md space-y-4 text-center">
+          <p role="alert" className="text-[#FAF8F2]">
+            {t("auth.profileLoadFailed")}
+          </p>
+          <button type="button" className="rounded-lg bg-[#C9A84C] px-6 py-3 text-[#0D0D0D]" onClick={() => {
+            decidedRef.current = false;
+            setCheckFailed(false);
+            setChecking(true);
+            setCheckAttempt((value) => value + 1);
+          }}>{t("auth.retryProfile")}</button>
+        </div>
+      </div>
+    );
   }
 
   if (checking && !showRoleSelect && !showPhoneStep) {

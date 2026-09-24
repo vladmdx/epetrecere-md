@@ -90,6 +90,17 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Administrators can access every venue, but that does not make them venue
+  // owners. Preserve their role before consulting the membership resolver.
+  if (dbUser.role === "admin" || dbUser.role === "super_admin") {
+    return NextResponse.json({
+      role: dbUser.role,
+      onboardingComplete: true,
+      isNewUser: false,
+      hasVenue: false,
+    });
+  }
+
   // Check venue ownership (separate from role). ADR 0028 — membership chain.
   const venueRows = await db
     .select({

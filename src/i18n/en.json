@@ -56,6 +56,8 @@
     "phoneHint": "Used for booking confirmations. It is not displayed publicly. Authorized administrators can access it, and it is shared with the other party only after final confirmation of the booking by both parties.",
     "phoneTooShort": "That phone number is too short",
     "phoneSaveFailed": "We couldn't save your number. Please try again.",
+    "profileLoadFailed": "We couldn't load your profile. Try again — you don't need to sign out.",
+    "retryProfile": "Try again",
     "roleQuestion": "How would you like to use the platform?",
     "roleClient": "Client",
     "roleClientDesc": "I'm looking for artists and venues for my event",

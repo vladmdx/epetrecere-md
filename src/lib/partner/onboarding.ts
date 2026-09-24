@@ -49,6 +49,7 @@ import {
 } from "./registration-state";
 import { writeUserPhoneLocked } from "@/lib/auth/user-phone";
 import { hallReviewIssues } from "./hall-review";
+import { enqueueRegistrationEmails } from "@/lib/notifications/registration-email";
 
 export type OnboardingStep =
   | "organization"
@@ -1447,20 +1448,20 @@ export async function submitVenueForApproval(
       .from(users)
       .where(inArray(users.role, ["admin", "super_admin"]));
     if (admins.length > 0) {
-      await executor
+      const insertedNotifications = await executor
         .insert(notifications)
         .values(admins.map((admin) => ({
           userId: admin.id,
           type: "venue_registered",
           title: "Local trimis la aprobare",
           message: `${venue?.nameRo ?? "Local"} (#${venueId}) a fost trimis spre aprobare.`,
-          actionUrl: "/admin",
+          actionUrl: "/admin/cereri-inregistrare",
           dedupeKey: `venue_registered:${venueId}:${submissionKey}:${admin.id}`,
         })))
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: notifications.id });
+      await enqueueRegistrationEmails(executor, insertedNotifications.map((row) => row.id));
     }
-    // External email delivery intentionally remains Phase 6 outbox work. It
-    // must not be dispatched directly from this transaction or route.
     return {
       ok: true as const,
       venueId,

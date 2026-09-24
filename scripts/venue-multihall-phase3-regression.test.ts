@@ -5,7 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
@@ -45,6 +45,7 @@ import {
 } from "../src/lib/legal";
 
 const MARK = `p3_${Date.now()}_`;
+const globalAdminIds: string[] = [];
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const IDENTITY = {
@@ -130,6 +131,11 @@ before(async () => {
   ids.manager = await mkUser("manager");
   ids.staff = await mkUser("staff");
   ids.outsider = await mkUser("outsider", "+37369222222");
+  for (const role of ["admin", "super_admin"] as const) {
+    const id = await mkUser(`global_${role}`);
+    await db.update(users).set({ role }).where(eq(users.id, id));
+    globalAdminIds.push(id);
+  }
 
   const org = await ensureDraftOrganization(appUser(ids.owner), {
     displayName: MARK + "Org A",
@@ -265,6 +271,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (globalAdminIds.length) await db.delete(users).where(inArray(users.id, globalAdminIds));
   const venueIds = [ids.venue, ids.venue2].filter(Boolean);
   if (venueIds.length) {
     await db.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
@@ -291,6 +298,25 @@ test("new company → venue → two halls → submit pending", async () => {
   const halls = await db.select({ id: venueHalls.id, status: venueHalls.status }).from(venueHalls).where(eq(venueHalls.venueId, ids.venue));
   assert.equal(halls.length, 2);
   assert.ok(halls.every((hall) => hall.status === "pending"));
+});
+
+test("submission atomically queues email for both administrators without duplicate retries", async () => {
+  async function queuedRecipients() {
+    return db.execute<{ user_id: string; status: string }>(sql`
+      SELECT n.user_id, q.status FROM notifications n
+      JOIN admin_registration_email_outbox q ON q.notification_id = n.id
+      WHERE n.type = 'venue_registered'
+        AND n.user_id IN (${sql.join(globalAdminIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        AND n.dedupe_key LIKE ${`venue_registered:${ids.venue}:%`}
+    `);
+  }
+  const initial = await queuedRecipients();
+  assert.equal(initial.length, 2);
+  assert.deepEqual(new Set(initial.map((row) => row.user_id)), new Set(globalAdminIds));
+  assert.ok(initial.every((row) => row.status === 'pending'));
+  const retry = await submitVenueForApproval(ids.owner, ids.venue);
+  assert.equal(retry.ok, true);
+  assert.equal((await queuedRecipients()).length, 2);
 });
 
 test("existing org with contract adds a second venue without resigning", async () => {
