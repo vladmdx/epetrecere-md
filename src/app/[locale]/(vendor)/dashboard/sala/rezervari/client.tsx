@@ -51,9 +51,10 @@ import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
 import { useLocale } from "@/hooks/use-locale";
 import { formatBookingDate } from "@/lib/format/booking-date";
 import { canCompleteBooking } from "@/lib/booking/completion-eligibility";
+import { bookingHallLabel, type BookingHallDisplay } from "@/lib/booking/hall-display";
 import { canNegotiate, parseOfferAmount, type PriceOffer } from "@/lib/booking/negotiation";
 
-interface Booking {
+interface Booking extends BookingHallDisplay {
   id: number;
   venueId: number | null;
   eventPlanId: number | null;
@@ -688,6 +689,7 @@ export function VenueBookingsClient({
                       </div>
 
                       {/* Client info */}
+                      <p className="text-sm font-medium text-gold">{bookingHallLabel(b, locale)}</p>
                       <div className="space-y-1 text-sm">
                         <p className="font-semibold">{b.clientName}</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -974,6 +976,7 @@ export function VenueBookingsClient({
             {acceptDialog && (acceptDialog.priceOffers?.at(-1)?.amount ?? acceptDialog.agreedPrice) != null && (
               <p className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-sm">{t("planner.negotiation.amountLabel")}: <strong className="text-gold">{acceptDialog.priceOffers?.at(-1)?.amount ?? acceptDialog.agreedPrice}€</strong></p>
             )}
+            {acceptDialog && <p className="text-sm font-medium text-gold">{bookingHallLabel(acceptDialog, locale)}</p>}
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
               <CalendarIcon className="mr-1.5 inline h-3.5 w-3.5 text-emerald-400" />
               {t("vendorSalaBookings.calendarNotePrefix")}{" "}

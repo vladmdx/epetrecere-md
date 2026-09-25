@@ -3,7 +3,8 @@ import { z } from "zod/v4";
 import { BookingRequestCreateSchema } from "@epetrecere/shared";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { bookingRequests, artists, venues } from "@/lib/db/schema";
+import { bookingRequests, artists, venues, venueHalls } from "@/lib/db/schema";
+import { bookingHallNameSql } from "@/lib/booking/hall-display-sql";
 import { users } from "@/lib/db/schema";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -239,6 +240,9 @@ export async function GET(req: NextRequest) {
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
+      hallId: bookingRequests.hallId,
+      hallName: bookingHallNameSql(bookingRequests.commercialSnapshot, venueHalls.nameRo),
+      reservationScope: bookingRequests.reservationScope,
       eventPlanId: bookingRequests.eventPlanId,
       clientName: bookingRequests.clientName,
       clientPhone: bookingRequests.clientPhone,
@@ -268,6 +272,7 @@ export async function GET(req: NextRequest) {
     })
     .from(bookingRequests)
     .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
+    .leftJoin(venueHalls, and(eq(venueHalls.id, bookingRequests.hallId), eq(venueHalls.venueId, bookingRequests.venueId)))
     .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .where(and(...conditions))
     .orderBy(desc(bookingRequests.createdAt))
@@ -357,6 +362,7 @@ export async function GET(req: NextRequest) {
       clientName: bookingTextForViewer(row.clientName, showContact),
       artistName: bookingTextForViewer(row.artistName, textShared),
       venueName: bookingTextForViewer(row.venueName, textShared),
+      hallName: bookingTextForViewer(row.hallName, textShared),
       eventType: bookingTextForViewer(row.eventType, textShared),
       adminNotes: isAdmin ? row.adminNotes : null,
       message: bookingTextForViewer(row.message, textShared),

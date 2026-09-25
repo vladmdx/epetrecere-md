@@ -3472,6 +3472,10 @@
     "enable": "Включить уведомления"
   },
   "booking": {
+    "hallLabel": "Зал: {name}",
+    "hallById": "Зал №{id}",
+    "hallWholeVenue": "Всё заведение",
+    "hallUnspecified": "Зал не указан (прежнее бронирование)",
     "awaitingVenue": "Ожидается подтверждение зала",
     "awaitingClient": "Ожидается согласие клиента",
     "venueConfirm": "Подтвердить бронирование",
