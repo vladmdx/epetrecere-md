@@ -17,6 +17,7 @@ import { resolveVenuePosition, type LatLng } from "@/lib/geo/city-coords";
 export interface MapVenue {
   id: number;
   slug: string;
+  detailHref?: string;
   name: string;
   city: string | null;
   lat?: number | null;
@@ -207,7 +208,7 @@ export function ClusterPanel({
         {cluster.items.map((v) => (
           <li key={v.id}>
             <Link
-              href={`/sali/${v.slug}`}
+              href={v.detailHref ?? `/sali/${v.slug}`}
               className="flex gap-3 rounded-lg border border-border/50 p-2 transition-colors hover:border-gold/40 hover:bg-gold/5"
             >
               {v.imageUrl && (
