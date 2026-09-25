@@ -3,7 +3,8 @@ import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 // Uses the unified booking_requests table with venueId set.
 
 import { db } from "@/lib/db";
-import { bookingRequests, users, eventPlans, artists } from "@/lib/db/schema";
+import { bookingRequests, users, eventPlans, artists, venueHalls } from "@/lib/db/schema";
+import { bookingHallNameSql } from "@/lib/booking/hall-display-sql";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { visiblePriceOffers, type PriceOffer } from "@/lib/booking/negotiation";
 
@@ -26,6 +27,9 @@ const TAB_STATUSES: Record<VenueBookingTab, BookingStatus[]> = {
 
 export type VenueBooking = {
   id: number;
+  hallId: number | null;
+  hallName: string | null;
+  reservationScope: string | null;
   venueId: number | null;
   eventPlanId: number | null;
   clientUserId: string | null;
@@ -68,6 +72,9 @@ export async function getVenueBookings(
     .select({
       id: bookingRequests.id,
       venueId: bookingRequests.venueId,
+      hallId: bookingRequests.hallId,
+      hallName: bookingHallNameSql(bookingRequests.commercialSnapshot, venueHalls.nameRo),
+      reservationScope: bookingRequests.reservationScope,
       eventPlanId: bookingRequests.eventPlanId,
       clientUserId: bookingRequests.clientUserId,
       clientName: bookingRequests.clientName,
@@ -91,6 +98,7 @@ export async function getVenueBookings(
       userEmail: users.email,
     })
     .from(bookingRequests)
+    .leftJoin(venueHalls, and(eq(venueHalls.id, bookingRequests.hallId), eq(venueHalls.venueId, bookingRequests.venueId)))
     .leftJoin(eventPlans, eq(bookingRequests.eventPlanId, eventPlans.id))
     .leftJoin(users, eq(bookingRequests.clientUserId, users.id))
     .where(
@@ -168,6 +176,7 @@ export async function getVenueBookings(
     const canSeeContact = contactSharedStatuses.has(r.status);
     return {
       ...r,
+      hallName: bookingTextForViewer(r.hallName, canSeeContact),
       clientName: bookingTextForViewer(r.clientName, canSeeContact),
       planTitle: bookingTextForViewer(r.planTitle, canSeeContact),
       eventType: bookingTextForViewer(r.eventType, canSeeContact),

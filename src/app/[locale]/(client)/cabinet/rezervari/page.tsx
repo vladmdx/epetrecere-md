@@ -40,8 +40,9 @@ import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 import { canNegotiate, parseOfferAmount } from "@/lib/booking/negotiation";
 import { pendingBookingWindow } from "@/lib/booking/response-window";
 import { formatBookingDate } from "@/lib/format/booking-date";
+import { bookingHallLabel, type BookingHallDisplay } from "@/lib/booking/hall-display";
 
-interface BookingRequest {
+interface BookingRequest extends BookingHallDisplay {
   id: number;
   artistId: number | null;
   venueId?: number | null;
@@ -490,6 +491,9 @@ export default function ReservationsPage() {
               )}
 
               {/* Event details */}
+              {(b.venueId != null || b.hallName != null) && (
+                <p className="text-sm font-medium text-gold">{bookingHallLabel(b, locale)}</p>
+              )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />

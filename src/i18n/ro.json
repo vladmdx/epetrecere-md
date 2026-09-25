@@ -3472,6 +3472,10 @@
     "enable": "Activează notificări"
   },
   "booking": {
+    "hallLabel": "Sală: {name}",
+    "hallById": "Sală #{id}",
+    "hallWholeVenue": "Întregul local",
+    "hallUnspecified": "Sală nespecificată (rezervare anterioară)",
     "awaitingVenue": "Se așteaptă confirmarea sălii",
     "awaitingClient": "Se așteaptă acceptarea clientului",
     "venueConfirm": "Confirmă rezervarea",

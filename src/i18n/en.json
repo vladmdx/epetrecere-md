@@ -3472,6 +3472,10 @@
     "enable": "Enable notifications"
   },
   "booking": {
+    "hallLabel": "Hall: {name}",
+    "hallById": "Hall #{id}",
+    "hallWholeVenue": "Entire venue",
+    "hallUnspecified": "Hall unspecified (historical booking)",
     "awaitingVenue": "Awaiting venue confirmation",
     "awaitingClient": "Awaiting client acceptance",
     "venueConfirm": "Confirm booking",
