@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { DashboardSignOut } from "@/components/shared/dashboard-sign-out";
 import { publishedVendorProfileHref } from "@/lib/vendors/publication";
 
 const artistNav = [
@@ -163,7 +164,8 @@ export function VendorSidebar() {
 
         <NavList items={navItems} pathname={pathname} />
 
-        <div className="border-t border-border/40 p-2">
+        <div className="shrink-0 border-t border-border/40 p-2">
+          <DashboardSignOut />
           <LanguageSwitcher />
           {profileHref && <Link
             href={profileHref}
@@ -220,7 +222,8 @@ export function VendorSidebar() {
               pathname={pathname}
               onNavigate={() => setMobileOpen(false)}
             />
-            <div className="border-t border-border/40 p-2">
+            <div className="shrink-0 border-t border-border/40 p-2">
+              <DashboardSignOut />
               <LanguageSwitcher />
               {profileHref && <Link
                 href={profileHref}
