@@ -26,6 +26,7 @@ import { WishlistButton } from "@/components/public/wishlist-button";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { localizePath } from "@/lib/i18n/routing";
+import { venueCatalogDetailHref } from "@/lib/venues/catalog-detail-link";
 import { cn } from "@/lib/utils";
 import { CatalogSeoContent } from "@/components/public/catalog-seo-content";
 import { useUser } from "@clerk/nextjs";
@@ -106,6 +107,7 @@ export function VenuesListClient({
       venues.map((v) => ({
         id: v.id,
         slug: v.slug,
+        detailHref: venueCatalogDetailHref(v.slug, searchParams),
         name: getLocalized(v, "name", locale),
         city: v.city ?? null,
         lat: (v as { lat?: number | null }).lat ?? null,
@@ -115,7 +117,7 @@ export function VenuesListClient({
         ratingAvg: v.ratingAvg ?? null,
         imageUrl: v.coverImageUrl ?? null,
       })),
-    [venues, locale],
+    [venues, locale, searchParams],
   );
   const locations = Array.from(new Set([...knownCities, ...cities].filter(Boolean)));
 
@@ -361,6 +363,7 @@ export function VenuesListClient({
                     <VenueCard
                       key={venue.id}
                       venue={venue}
+                      detailHref={venueCatalogDetailHref(venue.slug, searchParams)}
                       imageIndex={index}
                       availableOn={
                         venue.availabilityStatus === "available"
@@ -375,7 +378,7 @@ export function VenuesListClient({
               ) : (
                 <div className="space-y-2">
                   {venues.map((venue, index) => (
-                    <VenueListCard key={venue.id} venue={venue} imageIndex={index} detailed={viewMode.density === "detailed"} />
+                    <VenueListCard key={venue.id} venue={venue} detailHref={venueCatalogDetailHref(venue.slug, searchParams)} imageIndex={index} detailed={viewMode.density === "detailed"} />
                   ))}
                 </div>
               )
@@ -424,7 +427,7 @@ export function VenuesListClient({
   );
 }
 
-function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed: boolean; imageIndex: number }) {
+function VenueListCard({ venue, detailHref, detailed, imageIndex }: { venue: Venue; detailHref: string; detailed: boolean; imageIndex: number }) {
   const { locale, t } = useLocale();
   const name = getLocalized(venue, "name", locale);
   const fallback = `/images/venues/hall-${(imageIndex % 6) + 1}.jpg`;
@@ -432,13 +435,13 @@ function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed
 
   return (
     <div className={cn("flex gap-3 rounded-xl border border-white/8 bg-[#111522] p-3 transition-colors hover:border-[#e6b84d]/35", detailed && "gap-4 p-4")}>
-      <Link href={`/sali/${venue.slug}`} className={cn("relative shrink-0 overflow-hidden rounded-lg", detailed ? "h-28 w-40" : "h-16 w-24")}>
+      <Link href={detailHref} className={cn("relative shrink-0 overflow-hidden rounded-lg", detailed ? "h-28 w-40" : "h-16 w-24")}>
         <Image src={image} alt={name} fill sizes={detailed ? "160px" : "96px"} className="object-cover" unoptimized={image.includes("r2.cloudflarestorage.com")} />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link href={`/sali/${venue.slug}`} className="line-clamp-1 font-heading font-semibold text-white hover:text-[#e6b84d]">
+            <Link href={detailHref} className="line-clamp-1 font-heading font-semibold text-white hover:text-[#e6b84d]">
               {name}
             </Link>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/48">

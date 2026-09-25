@@ -34,6 +34,7 @@ interface VenueCardProps {
     availabilityStatus?: string;
   };
   imageIndex?: number;
+  detailHref?: string;
   /**
    * The date the list was filtered on (YYYY-MM-DD). Only then may the card
    * claim availability: getVenues({ availableDate }) drops every venue booked
@@ -44,7 +45,7 @@ interface VenueCardProps {
   availableOn?: string | null;
 }
 
-export function VenueCard({ venue, availableOn }: VenueCardProps) {
+export function VenueCard({ venue, availableOn, detailHref }: VenueCardProps) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
@@ -60,7 +61,7 @@ export function VenueCard({ venue, availableOn }: VenueCardProps) {
 
   return (
     <Link
-      href={`/sali/${venue.slug}`}
+      href={detailHref ?? `/sali/${venue.slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-white/8 bg-[#111522] transition-all duration-300 hover:-translate-y-1 hover:border-[#e6b84d]/45 hover:shadow-[0_18px_38px_rgba(0,0,0,.28)]"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-[#0a0d14]">
