@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "@/components/shared/locale-link";
+import { plainText } from "@/lib/content/plain-text";
+import { venueFormValidationMessage } from "@/lib/partner/onboarding-feedback";
 import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
 import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { onboardingSubmitDisabled } from "@/lib/legal/onboarding-submit";
@@ -249,6 +252,7 @@ export default function MultiHallVenueOnboarding() {
   );
   const [hasContract, setHasContract] = useState(false);
   const [missing, setMissing] = useState<Missing[]>([]);
+  const [venueFormError, setVenueFormError] = useState<string | null>(null);
   const [signature, setSignature] = useState<ESignatureValue | null>(null);
   const [showAgreementValidation, setShowAgreementValidation] = useState(false);
   const [availableDrafts, setAvailableDrafts] = useState<RecoverableOnboardingDraft[]>([]);
@@ -338,6 +342,7 @@ export default function MultiHallVenueOnboarding() {
     setHasContract(false);
     setOrganizationCapabilities(null);
     setMissing([]);
+    setVenueFormError(null);
     setSignature(null);
     setShowAgreementValidation(false);
     setOrg({ ...EMPTY_ORGANIZATION_FORM });
@@ -386,6 +391,7 @@ export default function MultiHallVenueOnboarding() {
     setHasContract(false);
     setOrganizationCapabilities(null);
     setMissing([]);
+    setVenueFormError(null);
     setSignature(null);
     setShowAgreementValidation(false);
     setOrg({ ...EMPTY_ORGANIZATION_FORM });
@@ -1321,6 +1327,19 @@ export default function MultiHallVenueOnboarding() {
       toast.error("Payload-ul original lipsește. Verifică din nou sau renunță explicit la cerere.");
       return false;
     }
+    // Never freeze invalid new input into the recovery slot. An existing
+    // in-flight request must still retry its original immutable payload.
+    if (venueId || !hasPendingVenueCreate) {
+      const message = venueFormValidationMessage({
+        ...venueCreatePayloadFromForm(venue), organizationId,
+        ...(venueId ? { venueId } : {}),
+      });
+      setVenueFormError(message);
+      if (message) {
+        toast.error(message);
+        return false;
+      }
+    }
     const scopeToken = captureScopeToken(actorId);
     if (!scopeToken) return false;
     setBusy(true);
@@ -1390,7 +1409,11 @@ export default function MultiHallVenueOnboarding() {
       const data = await res.json().catch(() => ({}));
       if (!isScopeTokenCurrent(scopeToken)) return false;
       if (!res.ok) {
-        toast.error(data.error || "Localul nu a putut fi salvat");
+        const message = data.error === "Validation failed"
+          ? "Verifică numele, telefonul, orașul și adresa localului."
+          : data.error || "Localul nu a putut fi salvat";
+        setVenueFormError(message);
+        toast.error(message);
         return false;
       }
       const savedVenueId = Number(data?.venue?.id);
@@ -1414,6 +1437,7 @@ export default function MultiHallVenueOnboarding() {
         setCreateRequestId(null);
       }
       setVenueId(savedVenueId);
+      setVenueFormError(null);
       setVenueImagesDirty(false);
       setVenueNeedsAttachment(false);
       if (hallId) {
@@ -1810,6 +1834,7 @@ export default function MultiHallVenueOnboarding() {
 
       {step === 2 && (
         <div className="space-y-3">
+          {venueFormError && <p role="alert" className="text-sm text-red-400">{venueFormError}</p>}
           {!venueId && (hasPendingVenueCreate || venueCreateRecoveryOnly) && (
             <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
               <p>{hasPendingVenueCreate
@@ -1834,14 +1859,14 @@ export default function MultiHallVenueOnboarding() {
             <Label>Nume local</Label>
             <Input value={venue.name} onChange={(e) => setVenue({ ...venue, name: e.target.value })} />
             <Label>Telefon</Label>
-            <Input value={venue.phone} onChange={(e) => setVenue({ ...venue, phone: e.target.value })} />
+            <Input type="tel" autoComplete="tel" aria-label="Telefon local" value={venue.phone} onChange={(e) => setVenue({ ...venue, phone: e.target.value })} />
             <Label>Oraș</Label>
             <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={venue.city} onChange={(e) => setVenue({ ...venue, city: e.target.value })}>
               {MOLDOVA_CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
             </select>
             <Label>Adresă</Label>
             <Input value={venue.address} onChange={(e) => setVenue({ ...venue, address: e.target.value })} />
-            <Textarea placeholder="Descriere RO" value={venue.descriptionRo} onChange={(e) => setVenue({ ...venue, descriptionRo: e.target.value })} />
+            <Textarea aria-label="Descriere RO" placeholder="Descriere RO" value={plainText(venue.descriptionRo)} onChange={(e) => setVenue({ ...venue, descriptionRo: e.target.value })} />
             <div className="space-y-2">
               <Label>Fotografii local (minimum una, maximum 10)</Label>
               {venue.imageUrls.map((url, index) => (
@@ -1903,6 +1928,14 @@ export default function MultiHallVenueOnboarding() {
 
       {step === 3 && (
         <div className="space-y-3">
+          {venueId && hallId && (
+            <div className="rounded-lg border p-4 text-sm space-y-2">
+              <p>Fotografia sălii este obligatorie pentru aprobare. Completează fotografiile, prețurile și celelalte detalii în editorul sălii, apoi revino la trimitere.</p>
+              <Link className="text-gold underline" href={`/dashboard/locatii/${venueId}/sali/${hallId}`}>
+                Completează fotografiile și detaliile sălii
+              </Link>
+            </div>
+          )}
           {!hallId && (hasPendingHallCreate || hallCreateRecoveryOnly) && (
             <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
               <p>{hasPendingHallCreate
@@ -1949,6 +1982,11 @@ export default function MultiHallVenueOnboarding() {
         <div className="space-y-3 text-sm">
           <p>Organizație #{organizationId} · Local #{venueId} · Sală #{hallId}</p>
           <p>Butonul rămâne activ. Serverul întoarce câmpurile lipsă; formularul rămâne editabil.</p>
+          {venueId && hallId && (
+            <Link className="text-gold underline" href={`/dashboard/locatii/${venueId}/sali/${hallId}`}>
+              Verifică fotografiile și detaliile sălii înainte de trimitere
+            </Link>
+          )}
         </div>
       )}
 
