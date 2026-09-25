@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Plus, Building2, MapPin } from "lucide-react";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, venueHalls } from "@/lib/db/schema";
+import { venueReviewLabel } from "@/lib/partner/onboarding-feedback";
 import {
   listAccessibleOrganizations,
   listAccessibleVenues,
@@ -46,6 +47,10 @@ export default async function LocatiiPickerPage({
   if (venues.length === 0 && organizations.length === 0) {
     redirect(localizePath("/dashboard/venue-onboarding", locale));
   }
+  const hallStates = venues.length ? await db
+    .select({ venueId: venueHalls.venueId, status: venueHalls.status })
+    .from(venueHalls)
+    .where(inArray(venueHalls.venueId, venues.map((venue) => venue.id))) : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -96,7 +101,7 @@ export default async function LocatiiPickerPage({
                     </p>
                   </div>
                   <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {venue.isActive ? "activ" : "draft"}
+                    {venueReviewLabel(venue.isActive, hallStates.filter((hall) => hall.venueId === venue.id).map((hall) => hall.status))}
                   </span>
                 </CardContent>
               </Card>
