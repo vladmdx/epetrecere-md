@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { DashboardSignOut } from "@/components/shared/dashboard-sign-out";
 import { publishedVendorProfileHref } from "@/lib/vendors/publication";
 
 const NAV_ITEMS = [
@@ -135,7 +136,8 @@ export function VenueSidebar({
           canManageFinancials={canManageFinancials}
         />
 
-        <div className="border-t border-border/20 p-3">
+        <div className="shrink-0 border-t border-border/20 p-3">
+          <DashboardSignOut />
           <Link
             href="/dashboard/locatii"
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
@@ -212,7 +214,8 @@ export function VenueSidebar({
               onNavigate={() => setMobileOpen(false)}
             />
 
-            <div className="border-t border-border/20 p-3">
+            <div className="shrink-0 border-t border-border/20 p-3">
+              <DashboardSignOut />
               <Link
                 href="/dashboard/locatii"
                 onClick={() => setMobileOpen(false)}
