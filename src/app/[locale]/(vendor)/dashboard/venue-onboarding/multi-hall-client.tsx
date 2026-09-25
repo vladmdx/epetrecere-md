@@ -1292,8 +1292,11 @@ export default function MultiHallVenueOnboarding() {
       const canonical = new URLSearchParams({
         organizationId: String(savedOrganizationId),
       });
-      if (venueNeedsAttachment && venueId) {
+      // Saving the same organization must not reset an explicit venue selection.
+      // A new-venue flow must still ignore any stale venue from the old scope.
+      if (venueId && (!createIntent || venueNeedsAttachment)) {
         canonical.set("venueId", String(venueId));
+        if (hallCreateRequestId) canonical.set("hallCreateRequestId", hallCreateRequestId);
       }
       if (createIntent) {
         canonical.set("intent", "create");

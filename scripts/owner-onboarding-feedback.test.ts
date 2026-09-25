@@ -32,3 +32,17 @@ test("onboarding does not display raw rich-text markup and offers the actual hal
   assert.equal((source.match(/href=\{`\/dashboard\/locatii\/\$\{venueId\}\/sali\/\$\{hallId\}`\}/g) ?? []).length, 2);
   assert.match(source, /role="alert"/);
 });
+
+test("saving organization retains the selected venue and hall retry without contaminating new-venue intent", () => {
+  const source = readFileSync("src/app/[locale]/(vendor)/dashboard/venue-onboarding/multi-hall-client.tsx", "utf8");
+  const saveOrg = source.slice(source.indexOf("async function saveOrg()"), source.indexOf("async function saveVenue()"));
+  const canonicalization = saveOrg.slice(saveOrg.indexOf("const canonical = new URLSearchParams"), saveOrg.indexOf("router.replace(venueOnboardingUrl(locale, canonical))"));
+  assert.ok(canonicalization.length > 0);
+  // Execute the production URL construction, not a duplicated test implementation.
+  const build = new Function("savedOrganizationId", "venueId", "createIntent", "venueNeedsAttachment", "hallCreateRequestId", "createRequestId", `${canonicalization} return canonical;`);
+  assert.equal(build(3, 31, false, false, null, null).toString(), "organizationId=3&venueId=31");
+  assert.equal(build(3, 30, false, false, "hall-retry", null).toString(), "organizationId=3&venueId=30&hallCreateRequestId=hall-retry");
+  assert.equal(build(3, null, false, false, null, null).toString(), "organizationId=3");
+  assert.equal(build(3, 31, true, false, "stale-hall", "venue-retry").toString(), "organizationId=3&intent=create&createRequestId=venue-retry");
+  assert.equal(build(3, 31, false, true, null, null).toString(), "organizationId=3&venueId=31");
+});
