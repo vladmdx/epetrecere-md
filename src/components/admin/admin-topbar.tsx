@@ -7,12 +7,13 @@ import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { NotificationBell } from "@/components/public/notification-bell";
 import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
+import { DashboardAccountMenu } from "@/components/shared/dashboard-account-menu";
 
 export function AdminTopbar() {
   const { t } = useLocale();
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/40 bg-background px-4 pl-16 lg:px-6">
-      <div className="flex flex-1 items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <div className="relative hidden max-w-md flex-1 sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -22,10 +23,11 @@ export function AdminTopbar() {
         </div>
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
-        <LanguageSwitcher />
+        <LanguageSwitcher compactOnMobile />
         <ChatBell />
         <NotificationBell />
         <ThemeToggle />
+        <DashboardAccountMenu />
       </div>
     </header>
   );
