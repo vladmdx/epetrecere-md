@@ -17,7 +17,9 @@ export function registrationStatusEmail(props: RegistrationStatusProps): string 
   const safeName = props.name.replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[char] ?? char);
-  const pendingNote = props.remainingPendingHallCount
+  const pendingNote = props.remainingPendingHallCount === 1
+    ? " O altă sală rămâne în verificare."
+    : (props.remainingPendingHallCount ?? 0) > 1
     ? ` Alte ${props.remainingPendingHallCount} săli rămân în verificare.`
     : "";
   const reasonNote = props.rejectionReason

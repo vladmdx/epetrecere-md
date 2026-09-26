@@ -27,7 +27,7 @@ import {
   type Cluster,
   type MapVenue,
 } from "./venues-map-shared";
-import { loadGoogleMaps } from "@/lib/geo/google-maps-loader";
+import { loadGoogleMaps, subscribeGoogleMapsFailure } from "@/lib/geo/google-maps-loader";
 
 /** A gold circle for groups, a dark dot for single venues — same as Leaflet. */
 function pinIconUrl(count: number, approximate: boolean): string {
@@ -117,6 +117,12 @@ export default function VenuesMapGoogle({
   useEffect(() => {
     if (!hasPlaces) return;
     let cancelled = false;
+    const unavailable = () => {
+      if (cancelled) return;
+      setStatus("error");
+      onUnavailable?.();
+    };
+    const unsubscribe = subscribeGoogleMapsFailure(unavailable);
     loadGoogleMaps(apiKey, locale)
       .then((maps) => {
         if (cancelled || !hostRef.current || mapRef.current) return;
@@ -135,18 +141,12 @@ export default function VenuesMapGoogle({
         mapRef.current = map;
         setStatus("ready");
       })
-      .catch(() => {
-        if (cancelled) return;
-        setStatus("error");
-        onUnavailable?.();
-      });
+      .catch(unavailable);
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-    // onUnavailable is a stable callback from the parent; listing it would
-    // re-run the loader on every parent render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, locale, hasPlaces]);
+  }, [apiKey, locale, hasPlaces, onUnavailable]);
 
   // Redraw the pins whenever the clusters change.
   useEffect(() => {

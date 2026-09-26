@@ -22,6 +22,9 @@
 // /api/artists/crud or /api/venues/[id]. Owner gates live on the API.
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "@/components/shared/locale-link";
+import { localizePath } from "@/lib/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +82,10 @@ const DEFAULT_AUTO_REPLY =
 
 export default function VendorSettingsPage() {
   const { locale, t } = useLocale();
+  const router = useRouter();
+  const [chooseVenue, setChooseVenue] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<Loaded>({ kind: "none" });
@@ -87,9 +94,13 @@ export default function VendorSettingsPage() {
   // resolution order as `/dashboard/page.tsx` and `/dashboard/analytics`.
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadError(false);
+    setChooseVenue(false);
     (async () => {
       try {
         const artistRes = await fetch("/api/me/artist", { cache: "no-store" });
+        if (!artistRes.ok) throw new Error("Artist settings unavailable");
         if (artistRes.ok) {
           const json = await artistRes.json();
           if (!cancelled && json.artist) {
@@ -116,8 +127,19 @@ export default function VendorSettingsPage() {
           }
         }
         const venueRes = await fetch("/api/me/venue", { cache: "no-store" });
+        if (!venueRes.ok) throw new Error("Venue settings unavailable");
         if (venueRes.ok) {
           const json = await venueRes.json();
+          if (cancelled) return;
+          if (json.code === "VENUE_REQUIRED" || json.reason === "AMBIGUOUS") {
+            setChooseVenue(true);
+            setLoading(false);
+            return;
+          }
+          if (json.multiHall && Number.isSafeInteger(json.venue?.id) && json.venue.id > 0) {
+            router.replace(localizePath(`/dashboard/locatii/${json.venue.id}/setari`, locale));
+            return;
+          }
           if (!cancelled && json.venue) {
             const v = json.venue as Record<string, unknown>;
             setState({
@@ -136,6 +158,7 @@ export default function VendorSettingsPage() {
         }
       } catch {
         if (!cancelled) {
+          setLoadError(true);
           toast.error(t("vendor.settings.errLoad"));
           setLoading(false);
         }
@@ -144,7 +167,7 @@ export default function VendorSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, locale, router, retry]);
 
   async function handleSave() {
     if (state.kind === "none") {
@@ -219,6 +242,28 @@ export default function VendorSettingsPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (chooseVenue || loadError) {
+    return (
+      <div className="mx-auto w-full max-w-2xl space-y-6">
+        <h1 className="font-heading text-2xl font-bold">{t("vendor.settings.title")}</h1>
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <p>{loadError ? t("vendor.settings.errLoad") : {
+              ro: "Ai mai multe localuri. Alege localul pentru care vrei să modifici setările.",
+              ru: "У вас несколько заведений. Выберите заведение, настройки которого хотите изменить.",
+              en: "You have multiple venues. Choose the venue whose settings you want to change.",
+            }[locale]}</p>
+            {loadError ? <Button onClick={() => setRetry((value) => value + 1)}>{
+              { ro: "Încearcă din nou", ru: "Попробовать снова", en: "Try again" }[locale]
+            }</Button> : <Link href="/dashboard/locatii" className="inline-flex min-h-11 items-center rounded-lg bg-gold px-4 py-2 font-medium text-[#0D0D0D]">{
+              { ro: "Alege localul", ru: "Выбрать заведение", en: "Choose venue" }[locale]
+            }</Link>}
+          </CardContent>
+        </Card>
       </div>
     );
   }

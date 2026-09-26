@@ -12,6 +12,27 @@
  * the next full page load — reloading the API in place is not supported.
  */
 let pending: Promise<typeof google.maps> | null = null;
+let authFailed = false;
+let authHookInstalled = false;
+const failureListeners = new Set<() => void>();
+
+/** Google may reject authorization/billing AFTER its load callback resolved. */
+export function subscribeGoogleMapsFailure(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  if (!authHookInstalled) {
+    authHookInstalled = true;
+    const target = window as unknown as { gm_authFailure?: () => void };
+    const previous = target.gm_authFailure;
+    target.gm_authFailure = () => {
+      authFailed = true;
+      for (const notify of failureListeners) notify();
+      previous?.();
+    };
+  }
+  failureListeners.add(listener);
+  if (authFailed) listener();
+  return () => { failureListeners.delete(listener); };
+}
 
 export function loadGoogleMaps(
   apiKey: string,
@@ -20,15 +41,36 @@ export function loadGoogleMaps(
   if (typeof window === "undefined") {
     return Promise.reject(new Error("Google Maps can only load in the browser"));
   }
+  if (authFailed) return Promise.reject(new Error("Google Maps authorization failed"));
   if (window.google?.maps) return Promise.resolve(window.google.maps);
   if (pending) return pending;
 
   pending = new Promise<typeof google.maps>((resolve, reject) => {
     const callbackName = "__epGoogleMapsReady";
+    const script = document.createElement("script");
+    let settled = false;
+    let unsubscribe = () => {};
+    const timeout = window.setTimeout(() => fail("Google Maps load timed out"), 12000);
+    function cleanup() {
+      window.clearTimeout(timeout);
+      unsubscribe();
+      delete (window as unknown as Record<string, unknown>)[callbackName];
+    }
+    function fail(message: string) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      script.remove();
+      pending = null;
+      reject(new Error(message));
+    }
+    unsubscribe = subscribeGoogleMapsFailure(() => fail("Google Maps authorization failed"));
     (window as unknown as Record<string, unknown>)[callbackName] = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
       resolve(window.google.maps);
     };
-    const script = document.createElement("script");
     const params = new URLSearchParams({
       key: apiKey,
       language,
@@ -40,7 +82,6 @@ export function loadGoogleMaps(
     script.async = true;
     script.onerror = () => {
       // Let the next attempt retry rather than caching a dead promise.
-      pending = null;
       // A blocked script tag looks identical to a network failure and leaves
       // nothing in the network log, so name the usual suspect out loud.
       console.error(
@@ -49,7 +90,7 @@ export function loadGoogleMaps(
           "script-src/connect-src, or the API key is restricted to another " +
           "domain.",
       );
-      reject(new Error("Google Maps failed to load"));
+      fail("Google Maps failed to load");
     };
     document.head.appendChild(script);
   });

@@ -235,10 +235,10 @@ export function VenueSettingsClient({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-sm font-medium">{t("form.email")}</p>
-              <p className="text-xs text-muted-foreground">{userEmail || "—"}</p>
+              <p className="break-all text-xs text-muted-foreground">{userEmail || "—"}</p>
             </div>
             <Link
               href="/user-profile"
@@ -249,7 +249,7 @@ export function VenueSettingsClient({
           </div>
 
           {/* Language selector — spec 11.1 */}
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
+          <div className="flex flex-col items-start gap-3 rounded-lg bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <Label className="flex items-center gap-1.5 text-sm font-medium">
                 <Globe className="h-3.5 w-3.5 text-gold" /> {t("vendor.venueSettings.interfaceLanguage")}
@@ -258,7 +258,7 @@ export function VenueSettingsClient({
                 {t("vendor.venueSettings.languageHint")}
               </p>
             </div>
-            <div className="flex gap-1 rounded-lg border border-border/40 p-0.5">
+            <div className="flex shrink-0 gap-1 rounded-lg border border-border/40 p-0.5">
               {(["ro", "ru", "en"] as const).map((l) => (
                 <button
                   key={l}
@@ -268,8 +268,8 @@ export function VenueSettingsClient({
                   aria-pressed={language === l}
                   className={
                     language === l
-                      ? "rounded-md bg-gold px-3 py-1 text-xs font-semibold text-[#0D0D0D]"
-                      : "rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      ? "min-h-10 rounded-md bg-gold px-3 py-1 text-xs font-semibold text-[#0D0D0D]"
+                      : "min-h-10 rounded-md px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                   }
                 >
                   {l === "ro"
@@ -313,9 +313,9 @@ export function VenueSettingsClient({
           </div>
 
           <div>
-            <Label htmlFor="buffer-hours">
+            <Label htmlFor="buffer-hours" className="flex-col items-start gap-1 sm:flex-row sm:items-center">
               {t("vendor.venueSettings.bufferHours")}
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {t("vendor.venueSettings.bufferHoursHint")}
               </span>
             </Label>
