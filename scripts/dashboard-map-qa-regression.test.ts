@@ -130,6 +130,7 @@ test("renderer subscribes beyond initial load and parent keeps Leaflet fallback"
   assert.match(renderer, /subscribeGoogleMapsFailure\(unavailable\)/);
   assert.match(renderer, /cancelled = true;\s*unsubscribe\(\)/);
   const parent = readFileSync("src/components/public/venues-map.tsx", "utf8");
-  assert.match(parent, /GOOGLE_KEY && !googleFailed/);
+  assert.match(parent, /process.env.NEXT_PUBLIC_VENUE_MAP_PROVIDER === "google"/);
+  assert.match(parent, /USE_GOOGLE && GOOGLE_KEY && !googleFailed/);
   assert.match(parent, /<LeafletMap venues=\{venues\} labels=\{labels\}/);
 });
