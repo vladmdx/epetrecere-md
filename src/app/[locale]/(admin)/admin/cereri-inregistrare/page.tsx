@@ -23,6 +23,7 @@ import Link from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
 import { adminHallPriceText, adminVenueStatusText } from "@/lib/admin/venue-display";
+import { RegisteredVenuesOverview } from "@/components/admin/registered-venues-overview";
 
 interface RegistrationRequest {
   id: number;
@@ -188,7 +189,7 @@ export default function RegistrationRequestsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(["all", "artist", "venue"] as const).map((f) => (
           <Button
             key={f}
@@ -204,6 +205,8 @@ export default function RegistrationRequestsPage() {
           </Button>
         ))}
       </div>
+
+      <RegisteredVenuesOverview />
 
       {filtered.length === 0 ? (
         <Card>
