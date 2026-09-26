@@ -4,6 +4,7 @@
  * must follow the organization, not the legacy owner column.
  */
 import { createHash } from "node:crypto";
+import { venueApprovalNotice } from "./approval-notice";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -622,10 +623,7 @@ export async function approvePartnerVenue(
         recipients.map((recipient) => ({
           userId: recipient.userId,
           type: "registration_approved" as const,
-          title: venueBecameActive ? "Localul și prima sală au fost aprobate! 🎉" : "Săli noi aprobate! 🎉",
-          message: venueBecameActive
-            ? "Localul este acum vizibil, împreună cu sălile aprobate. Celelalte săli rămân în verificare."
-            : "Sălile aprobate sunt vizibile; sălile încă în verificare rămân private.",
+          ...venueApprovalNotice(venueBecameActive, reviewedHallIds.length, remainingPendingHallCount),
           actionUrl: dashboardPath,
           // A retry of the same decision is idempotent, while a genuine
           // reject -> resubmit -> approve cycle receives a fresh notice.

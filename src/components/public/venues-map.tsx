@@ -42,7 +42,7 @@ export function VenuesMap({ venues }: { venues: MapVenue[] }) {
   // Google can fail for reasons a visitor cannot act on — a blocked script, a
   // key restricted to another domain, an exhausted quota. Rather than show
   // them an error where a map should be, fall back to OpenStreetMap, which
-  // needs no key and always works.
+  // needs no Google key or billing account.
   const [googleFailed, setGoogleFailed] = useState(false);
   const handleUnavailable = useCallback(() => setGoogleFailed(true), []);
 
