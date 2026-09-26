@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Venue map — Google Maps when a key is configured, Leaflet otherwise.
+ * Venue map — Leaflet by default, Google Maps only when explicitly enabled.
  *
  * Both renderers touch `window` on import, so each loads client-side only.
  * Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (a Maps JavaScript API key from Google
- * Cloud, restricted to the site's domains) to switch to Google.
+ * Cloud, restricted to the site's domains) AND
+ * NEXT_PUBLIC_VENUE_MAP_PROVIDER=google to switch to Google after billing is
+ * verified. A configured key alone does not prove the project can serve maps.
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -15,6 +17,7 @@ import { plural, NOUNS } from "@/lib/i18n/plural";
 import type { MapVenue } from "./venues-map-shared";
 
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+const USE_GOOGLE = process.env.NEXT_PUBLIC_VENUE_MAP_PROVIDER === "google";
 
 function Placeholder({ text }: { text: string }) {
   return (
@@ -63,7 +66,7 @@ export function VenuesMap({ venues }: { venues: MapVenue[] }) {
     [locale, t],
   );
 
-  return GOOGLE_KEY && !googleFailed ? (
+  return USE_GOOGLE && GOOGLE_KEY && !googleFailed ? (
     <GoogleMap
       venues={venues}
       apiKey={GOOGLE_KEY}
