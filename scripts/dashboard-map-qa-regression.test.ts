@@ -34,6 +34,16 @@ test("generic settings distinguish selection, absence and errors without guessin
   assert.doesNotMatch(source, /venueIds\[0\]/);
 });
 
+test("mobile venue picker constrains intrinsic grid widths and stacks the status", () => {
+  const source = readFileSync("src/app/[locale]/(vendor)/dashboard/locatii/page.tsx", "utf8");
+  assert.match(source, /grid grid-cols-1 gap-3/);
+  assert.match(source, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
+  assert.match(source, /sm:col-start-3/);
+  const settings = readFileSync("src/app/[locale]/(vendor)/dashboard/sala/setari/client.tsx", "utf8");
+  assert.match(settings, /flex flex-col items-start gap-3.*sm:flex-row/);
+  assert.match(settings, /min-h-10 rounded-md/);
+});
+
 function loaderHarness() {
   const scripts: Array<{ onerror?: () => void; remove: () => void; removed?: boolean }> = [];
   const timers = new Map<number, () => void>();

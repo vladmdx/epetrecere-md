@@ -58,7 +58,7 @@ export default async function LocatiiPickerPage({
         <div>
           <h1 className="font-heading text-2xl font-bold">Localuri</h1>
           <p className="text-sm text-muted-foreground">
-            Alege un local. Autorizarea se face la fiecare cerere; această listă nu este un token.
+            Alege localul pe care vrei să-l gestionezi.
           </p>
         </div>
         <Link
@@ -81,26 +81,26 @@ export default async function LocatiiPickerPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {venues.map((venue) => (
             <Link
               key={venue.id}
               href={`/dashboard/locatii/${venue.id}`}
-              className="block"
+              className="block min-w-0"
             >
               <Card className="transition-colors hover:ring-gold/40">
-                <CardContent className="flex items-center gap-4 p-4">
+                <CardContent className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                   <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gold/10 text-gold">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{venue.nameRo}</p>
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {[venue.city, venue.address].filter(Boolean).join(" · ") || "Fără adresă"}
+                    <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="min-w-0 break-words">{[venue.city, venue.address].filter(Boolean).join(" · ") || "Fără adresă"}</span>
                     </p>
                   </div>
-                  <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span className="col-start-2 justify-self-start rounded-full bg-accent px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:col-start-3">
                     {venueReviewLabel(venue.isActive, hallStates.filter((hall) => hall.venueId === venue.id).map((hall) => hall.status))}
                   </span>
                 </CardContent>
