@@ -89,7 +89,7 @@ export const guideCopy: Record<AppLocale, GuideCopy> = {
       confirm: {
         title: "Urmărește răspunsurile și confirmă rezervările",
         description: "În „Rezervările Mele” vezi starea fiecărei cereri. Folosește mesajele pentru a discuta tariful, programul și detaliile cu furnizorul. Dacă partenerul a acceptat cererea și oferta îți convine, apasă „Confirmă”.",
-        imageAlt: "Rezervările Mele cu o sală confirmată, o ofertă acceptată și o cerere în așteptare.",
+        imageAlt: "Rezervările Mele cu un fotograf confirmat, o ofertă acceptată și o cerere în așteptare.",
         caption: "Statusurile din Rezervările Mele",
       },
       checklist: {
@@ -153,7 +153,7 @@ export const guideCopy: Record<AppLocale, GuideCopy> = {
       confirm: {
         title: "Следите за ответами и подтверждайте бронирования",
         description: "В разделе «Мои бронирования» виден статус каждого запроса. Обсудите цену, время и детали в сообщениях. Когда партнёр примет запрос, нажмите «Подтвердить», если предложение вам подходит.",
-        imageAlt: "Мои бронирования с подтверждённым залом, принятым предложением и запросом в ожидании.",
+        imageAlt: "Мои бронирования с подтверждённым фотографом, принятым предложением и запросом в ожидании.",
         caption: "Статусы в разделе «Мои бронирования»",
       },
       checklist: {
@@ -217,7 +217,7 @@ export const guideCopy: Record<AppLocale, GuideCopy> = {
       confirm: {
         title: "Follow the replies and confirm your bookings",
         description: "In My Bookings you can see the status of every request. Use messages to discuss the price, schedule and details. Once the provider accepts the request, select Confirm if you are happy with the offer.",
-        imageAlt: "My Bookings with a confirmed venue, an accepted offer and a pending request.",
+        imageAlt: "My Bookings with a confirmed photographer, an accepted offer and a pending request.",
         caption: "Statuses in My Bookings",
       },
       checklist: {
